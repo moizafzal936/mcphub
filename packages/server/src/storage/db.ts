@@ -150,6 +150,7 @@ export async function migrate(): Promise<{ encryptedLegacySecrets: number; orpha
   const appCols = await columns('apps')
   if (!appCols.has('owner_id')) await db.execute('ALTER TABLE apps ADD COLUMN owner_id TEXT')
   if (!appCols.has('rate_limit_per_min')) await db.execute('ALTER TABLE apps ADD COLUMN rate_limit_per_min INTEGER')
+  if (!appCols.has('read_only')) await db.execute('ALTER TABLE apps ADD COLUMN read_only INTEGER NOT NULL DEFAULT 0')
   await db.execute('CREATE INDEX IF NOT EXISTS idx_apps_owner ON apps(owner_id)')
   const userCols = await columns('users')
   if (!userCols.has('totp_secret')) await db.execute('ALTER TABLE users ADD COLUMN totp_secret TEXT')
@@ -281,6 +282,7 @@ function rowToApp(row: any): App {
     apiKeyHeader: String(row.api_key_header),
     hasApiKey: row.api_key != null && String(row.api_key) !== '',
     rateLimitPerMin: row.rate_limit_per_min == null ? null : Number(row.rate_limit_per_min),
+    readOnly: Number(row.read_only ?? 0) === 1,
     createdAt: Number(row.created_at),
     updatedAt: Number(row.updated_at),
   }
@@ -309,12 +311,13 @@ export const appRepo = {
     })
   },
 
-  async update(id: string, ownerId: string, patch: { name?: string; apiKey?: string | null; apiKeyHeader?: string; rateLimitPerMin?: number | null }): Promise<void> {
+  async update(id: string, ownerId: string, patch: { name?: string; apiKey?: string | null; apiKeyHeader?: string; rateLimitPerMin?: number | null; readOnly?: boolean }): Promise<void> {
     const sets: string[] = []
     const args: (string | number | null)[] = []
     if (patch.name !== undefined) { sets.push('name = ?'); args.push(patch.name) }
     if (patch.apiKeyHeader !== undefined) { sets.push('api_key_header = ?'); args.push(patch.apiKeyHeader) }
     if (patch.rateLimitPerMin !== undefined) { sets.push('rate_limit_per_min = ?'); args.push(patch.rateLimitPerMin) }
+    if (patch.readOnly !== undefined) { sets.push('read_only = ?'); args.push(patch.readOnly ? 1 : 0) }
     if (patch.apiKey !== undefined) {
       sets.push('api_key = ?')
       args.push(patch.apiKey ? encryptSecret(patch.apiKey, appSecretContext(id)) : null)

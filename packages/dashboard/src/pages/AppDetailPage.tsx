@@ -403,7 +403,10 @@ export default function AppDetailPage() {
           <Zap className="w-4 h-4 text-brand-400" />
         </div>
         <div>
-          <h1 className="text-xl font-bold text-white leading-tight">{app.name}</h1>
+          <h1 className="text-xl font-bold text-white leading-tight flex items-center gap-2">
+            {app.name}
+            {app.readOnly && <span className="text-[10px] font-medium text-amber-300 bg-amber-950 border border-amber-900 px-1.5 py-0.5 rounded">Read-only</span>}
+          </h1>
           <p className="text-xs text-gray-500 font-mono">{app.baseUrl}</p>
         </div>
         <div className="ml-auto flex items-center gap-2">

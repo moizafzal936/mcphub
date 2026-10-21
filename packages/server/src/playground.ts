@@ -31,7 +31,7 @@ export function playgroundEnabled(): boolean {
 export async function runPlayground(app: App, userId: string, history: PlaygroundTurn[]): Promise<{ reply: string; steps: PlaygroundStep[] }> {
   if (!playgroundEnabled()) throw new HttpError(503, 'The playground needs ANTHROPIC_API_KEY set on the server')
   const client = new Anthropic()
-  const tools = await toolRepo.findEnabledByAppId(app.id)
+  const tools = (await toolRepo.findEnabledByAppId(app.id)).filter(t => !app.readOnly || t.method === 'GET')
   const byName = new Map(tools.map(t => [t.name, t]))
 
   const messages: Anthropic.MessageParam[] = history.map(t => ({ role: t.role, content: t.content }))

@@ -7,6 +7,7 @@ export interface App {
   apiKeyHeader: string
   hasApiKey: boolean
   rateLimitPerMin: number | null
+  readOnly: boolean
   createdAt: number
   updatedAt: number
 }

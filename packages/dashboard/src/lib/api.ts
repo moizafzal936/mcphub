@@ -39,6 +39,7 @@ export interface App {
   apiKeyHeader: string
   hasApiKey: boolean
   rateLimitPerMin: number | null
+  readOnly?: boolean
   createdAt: number
   updatedAt: number
   toolCount?: number
@@ -139,7 +140,7 @@ export const api = {
       apiKey?: string
       apiKeyHeader?: string
     }) => http.post<App>('/apps', data).then(r => r.data),
-    update: (id: string, patch: { name?: string; apiKey?: string | null; apiKeyHeader?: string; rateLimitPerMin?: number | null }) =>
+    update: (id: string, patch: { name?: string; apiKey?: string | null; apiKeyHeader?: string; rateLimitPerMin?: number | null; readOnly?: boolean }) =>
       http.patch<App>(`/apps/${id}`, patch).then(r => r.data),
     delete: (id: string) => http.delete(`/apps/${id}`).then(r => r.data),
     import: (id: string, specUrl?: string) =>

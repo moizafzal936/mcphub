@@ -98,7 +98,9 @@ function buildMcpServer(appId: string, appName: string, userId: string): Server 
   server.setRequestHandler(ListToolsRequestSchema, async () => {
     const app = await appRepo.findForOwner(appId, userId)
     if (!app) return { tools: [] }
-    const tools = await toolRepo.findEnabledByAppId(appId)
+    const all = await toolRepo.findEnabledByAppId(appId)
+    // Read-only apps expose only GET tools to AI clients.
+    const tools = app.readOnly ? all.filter(t => t.method === 'GET') : all
     return {
       // Annotations let clients auto-approve reads but confirm writes, which limits what
       // instructions injected via upstream API responses can trigger.
@@ -130,6 +132,9 @@ function buildMcpServer(appId: string, appName: string, userId: string): Server 
     const tool = await toolRepo.findByNameInApp(appId, request.params.name)
     if (!tool || !tool.enabled) {
       return { content: [{ type: 'text' as const, text: `Unknown tool: ${request.params.name}` }], isError: true }
+    }
+    if (app.readOnly && tool.method !== 'GET') {
+      return { content: [{ type: 'text' as const, text: `${app.name} is in read-only mode; ${tool.method} tools are disabled for AI clients.` }], isError: true }
     }
 
     const result = await runTool(app, tool, request.params.arguments ?? {}, `token:${auth.tokenId}`)

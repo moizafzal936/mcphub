@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { KeyRound, Loader2, Trash2 } from 'lucide-react'
+import { Eye, KeyRound, Loader2, Trash2 } from 'lucide-react'
 import { api, apiError, type App } from '../lib/api.ts'
 import { useToast } from './Toast.tsx'
 
@@ -74,6 +74,22 @@ export function SettingsPanel({ app, onUpdated }: { app: App; onUpdated: (app: A
           Save settings
         </button>
       </form>
+
+      <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox" className="mt-1" checked={!!app.readOnly} disabled={busy !== null}
+            onChange={e => save({ readOnly: e.target.checked }, 'save', e.target.checked ? 'Read-only mode on' : 'Read-only mode off')}
+          />
+          <span>
+            <span className="flex items-center gap-2 font-semibold text-white"><Eye className="w-4 h-4 text-brand-400" />Read-only mode</span>
+            <span className="block text-sm text-gray-500 mt-1">
+              AI clients only see GET tools, and POST/PUT/PATCH/DELETE calls are refused by the server. Useful for demos against real data.
+              You can still run any tool from the Test tab.
+            </span>
+          </span>
+        </label>
+      </div>
 
       <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-3">
         <div className="flex items-center gap-2">

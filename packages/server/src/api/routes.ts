@@ -49,6 +49,7 @@ const updateAppSchema = z.object({
   apiKey: z.string().max(4096).nullable().optional(),
   apiKeyHeader: credentialHeaderSchema.optional(),
   rateLimitPerMin: rateLimitSchema.optional(),
+  readOnly: z.boolean().optional(),
 }).strict()
 
 const createToolSchema = z.object({
@@ -156,6 +157,7 @@ router.post('/apps', asyncHandler(async (req, res) => {
     apiKeyHeader: input.apiKeyHeader,
     hasApiKey: !!input.apiKey,
     rateLimitPerMin: input.rateLimitPerMin,
+    readOnly: false,
     createdAt: now,
     updatedAt: now,
   }

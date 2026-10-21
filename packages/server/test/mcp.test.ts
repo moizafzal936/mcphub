@@ -209,3 +209,24 @@ test('streamable HTTP: revoked tokens are rejected on the next request', async (
   await alice.del(`/api/apps/${app.id}/tokens/${id}`)
   await assert.rejects(client.listTools())
 })
+
+test('read-only mode hides and blocks write tools for AI clients', async () => {
+  const app = await createApp(alice, fx)
+  await addTool(alice, app.id, { name: 'read_item', path: '/items/{id}' })
+  await addTool(alice, app.id, { name: 'create_item', method: 'POST', path: '/echo' })
+  assert.equal((await alice.patch(`/api/apps/${app.id}`, { readOnly: true })).body.readOnly, true)
+  const { token } = await mintToken(alice, app.id)
+
+  const client = await connectHttp(app.id, token)
+  assert.deepEqual((await client.listTools()).tools.map(t => t.name), ['read_item'])
+  const hits = fx.upstreamHits.length
+  const blocked: any = await client.callTool({ name: 'create_item', arguments: {} })
+  assert.equal(blocked.isError, true)
+  assert.match(blocked.content[0].text, /read-only/)
+  assert.equal(fx.upstreamHits.length, hits, 'write reached upstream in read-only mode')
+
+  await alice.patch(`/api/apps/${app.id}`, { readOnly: false })
+  const allowed: any = await client.callTool({ name: 'create_item', arguments: {} })
+  assert.equal(allowed.isError, false)
+  await client.close()
+})
