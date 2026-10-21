@@ -9,3 +9,6 @@ packages/server/data
 .env.*
 .git
 .claude
+
+# Deployment settings (deploy/.env) never belong in the image build context.
+deploy

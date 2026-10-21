@@ -16,7 +16,7 @@ after(async () => {
 
 test('first user can bootstrap, then signup is closed unless MCPHUB_ALLOW_SIGNUP=true', async () => {
   const anon = new Client(srv.base)
-  assert.deepEqual((await anon.get('/api/auth/status')).body, { signupOpen: true, bootstrap: true })
+  assert.deepEqual((await anon.get('/api/auth/status')).body, { signupOpen: true, bootstrap: true, needsSetup: false })
   const owner = await registerUser(srv.base, 'owner@example.test')
   assert.equal((await owner.get('/api/auth/me')).body.user.email, 'owner@example.test')
   assert.equal((await anon.get('/api/auth/status')).body.signupOpen, false)

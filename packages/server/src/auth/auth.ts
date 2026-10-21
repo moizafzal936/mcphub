@@ -109,13 +109,22 @@ export function authRouter(): Router {
 
   router.get('/status', asyncHandler(async (_req, res) => {
     const users = await userRepo.count()
-    res.json({ signupOpen: users === 0 || getConfig().allowSignup, bootstrap: users === 0 })
+    const { allowSignup, webBootstrap } = getConfig()
+    res.json({
+      signupOpen: (users === 0 && webBootstrap) || allowSignup,
+      bootstrap: users === 0 && webBootstrap,
+      needsSetup: users === 0 && !webBootstrap && !allowSignup,
+    })
   }))
 
   router.post('/register', rateLimit('auth'), asyncHandler(async (req, res) => {
     const { email, password } = credentialsSchema.parse(req.body)
-    const allowSignup = getConfig().allowSignup
-    if (!allowSignup && (await userRepo.count()) > 0) throw new HttpError(403, 'Sign-up is disabled on this server')
+    const { allowSignup, webBootstrap } = getConfig()
+    const users = await userRepo.count()
+    if (!allowSignup && users > 0) throw new HttpError(403, 'Sign-up is disabled on this server')
+    if (!allowSignup && users === 0 && !webBootstrap) {
+      throw new HttpError(403, 'This server is not set up yet. Create the first account with the create-operator command on the server.')
+    }
     if (await userRepo.findByEmail(email)) throw new HttpError(409, 'An account with this email already exists')
     const user = { id: newId(), email, createdAt: Date.now(), passwordHash: await hashPassword(password) }
     let inserted = false

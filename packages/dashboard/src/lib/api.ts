@@ -155,7 +155,7 @@ export interface ExecResult {
 
 export const api = {
   auth: {
-    status: () => http.get<{ signupOpen: boolean; bootstrap: boolean }>('/auth/status').then(r => r.data),
+    status: () => http.get<{ signupOpen: boolean; bootstrap: boolean; needsSetup?: boolean }>('/auth/status').then(r => r.data),
     me: () => http.get<{ user: User }>('/auth/me').then(r => r.data.user),
     login: (email: string, password: string, code?: string) =>
       http.post<{ user: User }>('/auth/login', { email, password, ...(code ? { code } : {}) }).then(r => r.data.user),

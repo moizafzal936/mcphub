@@ -31,10 +31,13 @@ Run one instance only: MCP sessions and rate-limit counters are in process memor
   dashboard (or run `npm run assign-orphans -w packages/server -- you@example.com`).
 - Plaintext credentials from earlier versions are encrypted automatically at startup.
 
+See [DEPLOY.md](DEPLOY.md) for a step-by-step single-server deployment (Docker + Caddy, free HTTPS).
+
 ## Security model
 
 | Area | Control |
 |---|---|
+| First-run setup | In production the first account can't be created from the web (`MCPHUB_WEB_BOOTSTRAP` defaults to off), so a fresh public server can't be claimed by whoever finds it first; the operator is created from the server shell with `create-operator`. |
 | Dashboard auth | Email + password (scrypt N=2^17), optional TOTP two-factor (RFC 6238, secret encrypted at rest, codes single-use). Session: random 256-bit token in an HttpOnly, SameSite=Lax, Secure cookie; only its SHA-256 is stored. |
 | CSRF | `Sec-Fetch-Site` + `Origin` verification on state-changing requests; no wildcard CORS. |
 | Authorization | Every app, tool, log and token query is scoped by owner/app; other users' resources return 404. |
@@ -76,9 +79,9 @@ one transaction (nothing changes if any check fails). Then switch `MCPHUB_ENCRYP
 
 ## Tests
 
-`npm test -w packages/server` (96 tests) covers authentication, cross-tenant authorization, CSRF, credential storage,
+`npm test -w packages/server` (98 tests) covers authentication, cross-tenant authorization, CSRF, credential storage,
 exposure and rotation, SSRF (internal targets, IPv4/IPv6 forms, DNS rebinding, redirects, proxy env), MCP token and
 session isolation, revocation, expiry and connection caps over Streamable HTTP and SSE, the OAuth flow, rate limits,
-argument validation, log redaction/retention, ownerless-app claiming, hostile (self-referencing) specs, TOTP two-factor, operator password reset, config export/import, query-parameter credentials, AI-readiness scoring, response shaping, upstream OAuth client credentials, fixed headers/params and the playground loop (against a local stand-in for the Claude API;
+argument validation, log redaction/retention, ownerless-app claiming, hostile (self-referencing) specs, TOTP two-factor, operator password reset, config export/import, query-parameter credentials, AI-readiness scoring, response shaping, upstream OAuth client credentials, fixed headers/params, first-run operator setup, backups and the playground loop (against a local stand-in for the Claude API;
 real-model behaviour is not covered).
 Path-containment rules for tool paths have no dedicated test file yet; the Docker image has not been built in CI.

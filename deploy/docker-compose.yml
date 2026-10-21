@@ -1,0 +1,37 @@
+# MCPHub production stack: the app, plus Caddy for HTTPS with free Let's Encrypt certificates.
+# Run from this folder: docker compose up -d --build   (settings come from ./.env, see .env.example)
+services:
+  mcphub:
+    build: ..
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      MCPHUB_PUBLIC_URL: https://${MCPHUB_DOMAIN:?Set MCPHUB_DOMAIN in deploy/.env}
+      MCPHUB_TRUST_PROXY: "1"
+    volumes:
+      - mcphub-data:/data
+    restart: unless-stopped
+    # No published ports: only Caddy can reach the app.
+    logging: &logs
+      driver: json-file
+      options: { max-size: 10m, max-file: "3" }
+
+  caddy:
+    image: caddy:2.8
+    depends_on: [mcphub]
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      MCPHUB_DOMAIN: ${MCPHUB_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    restart: unless-stopped
+    logging: *logs
+
+volumes:
+  mcphub-data:
+  caddy-data:
+  caddy-config:

@@ -12,6 +12,8 @@ export interface Config {
   encryptionKey?: string
   cookieSecure: boolean
   allowSignup: boolean
+  /** Whether the very first account may be created from the web sign-up form. */
+  webBootstrap: boolean
   trustProxy: string | false
   allowedOrigins: string[]
   publicUrl?: string
@@ -55,6 +57,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     encryptionKey: env.MCPHUB_ENCRYPTION_KEY || undefined,
     cookieSecure: env.MCPHUB_COOKIE_SECURE ? env.MCPHUB_COOKIE_SECURE === 'true' : isProduction,
     allowSignup: env.MCPHUB_ALLOW_SIGNUP === 'true',
+    // Off in production: on a fresh public server, whoever registers first would become the
+    // operator. Production creates the first account with the create-operator command instead.
+    webBootstrap: env.MCPHUB_WEB_BOOTSTRAP ? env.MCPHUB_WEB_BOOTSTRAP === 'true' : !isProduction,
     trustProxy: env.MCPHUB_TRUST_PROXY || false,
     allowedOrigins: list(env.MCPHUB_ALLOWED_ORIGINS),
     publicUrl: env.MCPHUB_PUBLIC_URL?.replace(/\/+$/, '') || undefined,

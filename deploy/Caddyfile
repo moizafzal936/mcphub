@@ -1,0 +1,8 @@
+# Caddy gets and renews the HTTPS certificate for this hostname automatically, and redirects
+# plain HTTP to HTTPS.
+{$MCPHUB_DOMAIN} {
+	reverse_proxy mcphub:3001 {
+		# MCP's SSE transport streams events; pass them through immediately.
+		flush_interval -1
+	}
+}
