@@ -310,6 +310,24 @@ export default function AppDetailPage() {
   const [showSpec, setShowSpec] = useState(false)
   const [editing, setEditing] = useState<{ id: string; name: string; description: string } | null>(null)
   const [stats, setStats] = useState<Record<string, { calls: number; errors: number; avgMs: number }>>({})
+  const [toolFilter, setToolFilter] = useState('')
+  const needle = toolFilter.trim().toLowerCase()
+  const shownTools = needle
+    ? tools.filter(t => `${t.name} ${t.method} ${t.path} ${t.description}`.toLowerCase().includes(needle))
+    : tools
+
+  async function setShownEnabled(enabled: boolean) {
+    if (!app) return
+    const targets = shownTools.filter(t => t.enabled !== enabled)
+    try {
+      await Promise.all(targets.map(t => api.tools.toggle(app.id, t.id, enabled)))
+      const ids = new Set(targets.map(t => t.id))
+      setTools(ts => ts.map(t => (ids.has(t.id) ? { ...t, enabled } : t)))
+      success(`${enabled ? 'Enabled' : 'Disabled'} ${targets.length} tool${targets.length === 1 ? '' : 's'}`)
+    } catch (err) {
+      error('Could not update tools', apiError(err))
+    }
+  }
 
   useEffect(() => {
     if (!id || tab !== 'tools') return
@@ -494,8 +512,20 @@ export default function AppDetailPage() {
       {/* Tools tab */}
       {tab === 'tools' && (
         <div>
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-xs text-gray-600">{tools.length} tools</p>
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                value={toolFilter} onChange={e => setToolFilter(e.target.value)} placeholder="Filter tools…" aria-label="Filter tools"
+                className="w-40 bg-gray-950 border border-gray-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-brand-500"
+              />
+              <span className="text-xs text-gray-600 whitespace-nowrap">{shownTools.length}/{tools.length}</span>
+              {toolFilter && shownTools.length > 0 && (
+                <>
+                  <button onClick={() => setShownEnabled(true)} className="text-xs text-gray-400 hover:text-white whitespace-nowrap">Enable shown</button>
+                  <button onClick={() => setShownEnabled(false)} className="text-xs text-gray-400 hover:text-white whitespace-nowrap">Disable shown</button>
+                </>
+              )}
+            </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowSpec(true)}
@@ -541,7 +571,7 @@ export default function AppDetailPage() {
                 </div>
               </div>
             )}
-            {tools.map(tool => (
+            {shownTools.map(tool => (
               <div
                 key={tool.id}
                 className={`bg-gray-900 border rounded-xl px-4 py-3.5 flex items-center gap-3 transition-all group ${
