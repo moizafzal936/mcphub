@@ -1,6 +1,6 @@
 #!/bin/bash
 # First-boot setup for an Oracle Cloud Ubuntu instance. Paste this whole file into:
-#   Create instance → Show advanced options → Management → Initialization script → Paste cloud-init script
+#   Create instance > Show advanced options > Management > Initialization script > Paste cloud-init script
 # It runs once, as root. Check it finished with: cloud-init status --wait
 set -eux
 
