@@ -6,7 +6,7 @@ import cors from 'cors'
 import helmet from 'helmet'
 import cookieParser from 'cookie-parser'
 import { getConfig } from './config.js'
-import { migrate } from './storage/db.js'
+import { getDb, migrate } from './storage/db.js'
 import { initEncryptionKey } from './security/secrets.js'
 import { rateLimit, clientIp } from './security/rateLimit.js'
 import { asyncHandler, errorHandler } from './http/errors.js'
@@ -38,8 +38,14 @@ export function createApp(): express.Express {
     app.use('/api', cors({ origin: config.allowedOrigins, credentials: true }))
   }
 
-  app.get('/health', (_req, res) => {
-    res.json({ status: 'ok' })
+  // Readiness: fails (503) when the database is unusable, so Docker/PM2 health checks can act.
+  app.get('/health', async (_req, res) => {
+    try {
+      await getDb().execute('SELECT 1')
+      res.json({ status: 'ok' })
+    } catch {
+      res.status(503).json({ status: 'unavailable' })
+    }
   })
 
   // ── OAuth 2.1 authorization server (discovery, DCR, authorize, token, revoke) ──

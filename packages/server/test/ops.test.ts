@@ -171,3 +171,18 @@ test('per-tool stats count calls, errors and latency, scoped to the owner', asyn
   assert.equal(typeof byName.ok_tool.avgMs, 'number')
   assert.equal((await other.get(`/api/apps/${app.id}/tool-stats`)).status, 404)
 })
+
+test('health check reports the database state', async () => {
+  const db = await import('../src/storage/db.js')
+  assert.equal((await fetch(`${srv.base}/health`)).status, 200)
+  const original = db.getDb().execute.bind(db.getDb())
+  ;(db.getDb() as any).execute = async () => { throw new Error('disk gone') }
+  try {
+    const res = await fetch(`${srv.base}/health`)
+    assert.equal(res.status, 503)
+    assert.deepEqual(await res.json(), { status: 'unavailable' })
+  } finally {
+    ;(db.getDb() as any).execute = original
+  }
+  assert.equal((await fetch(`${srv.base}/health`)).status, 200)
+})
