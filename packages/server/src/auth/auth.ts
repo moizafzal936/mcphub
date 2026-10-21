@@ -7,6 +7,7 @@ import { getConfig, issuerUrl } from '../config.js'
 import { sessionRepo, tokenRepo, userRepo, newId } from '../storage/db.js'
 import { burnPasswordCheck, hashPassword, randomToken, sha256, verifyPassword } from '../security/passwords.js'
 import { rateLimit, clientIp } from '../security/rateLimit.js'
+import { newTotpSecret, otpauthUrl, verifyTotp } from '../security/totp.js'
 import { asyncHandler, HttpError } from '../http/errors.js'
 import type { User } from '../types/index.js'
 
@@ -143,6 +144,19 @@ export function authRouter(): Router {
         throw new HttpError(401, 'Invalid email or password')
       }
       if (!(await verifyPassword(password, user.passwordHash))) throw new HttpError(401, 'Invalid email or password')
+      const totp = await userRepo.getTotp(user.id)
+      if (totp.enabled && totp.secret) {
+        const code = typeof req.body?.code === 'string' ? req.body.code.replace(/\s/g, '') : ''
+        if (!code) {
+          res.status(401).json({ error: 'Enter the 6-digit code from your authenticator app', twoFactorRequired: true })
+          return
+        }
+        const step = verifyTotp(totp.secret, code)
+        if (step === undefined || !(await userRepo.consumeTotpStep(user.id, step))) {
+          res.status(401).json({ error: 'Invalid or already-used two-factor code', twoFactorRequired: true })
+          return
+        }
+      }
       await startSession(res, user.id)
       res.json({ user: { id: user.id, email: user.email } })
     })
@@ -155,9 +169,40 @@ export function authRouter(): Router {
     res.json({ ok: true })
   }))
 
-  router.get('/me', requireUser, (req, res) => {
-    res.json({ user: { id: req.user!.id, email: req.user!.email } })
-  })
+  router.get('/me', requireUser, asyncHandler(async (req, res) => {
+    const totp = await userRepo.getTotp(req.user!.id)
+    res.json({ user: { id: req.user!.id, email: req.user!.email, twoFactorEnabled: totp.enabled } })
+  }))
+
+  // ── Two-factor (TOTP) ──
+  router.post('/2fa/setup', requireUser, asyncHandler(async (req, res) => {
+    if ((await userRepo.getTotp(req.user!.id)).enabled) throw new HttpError(409, 'Two-factor authentication is already enabled')
+    const secret = newTotpSecret()
+    await userRepo.setTotpPending(req.user!.id, secret)
+    res.json({ secret, otpauthUrl: otpauthUrl(secret, req.user!.email) })
+  }))
+
+  router.post('/2fa/enable', requireUser, rateLimit('auth'), asyncHandler(async (req, res) => {
+    const { code } = z.object({ code: z.string().trim() }).parse(req.body)
+    const totp = await userRepo.getTotp(req.user!.id)
+    if (totp.enabled) throw new HttpError(409, 'Two-factor authentication is already enabled')
+    if (!totp.secret) throw new HttpError(400, 'Start setup first')
+    const step = verifyTotp(totp.secret, code)
+    if (step === undefined || !(await userRepo.consumeTotpStep(req.user!.id, step, true))) throw new HttpError(400, 'That code is not valid; check your device clock and try again')
+    res.json({ ok: true })
+  }))
+
+  router.post('/2fa/disable', requireUser, rateLimit('auth'), asyncHandler(async (req, res) => {
+    const { password, code } = z.object({ password: z.string().max(200), code: z.string().trim() }).parse(req.body)
+    const user = await userRepo.findByEmail(req.user!.email)
+    const totp = await userRepo.getTotp(req.user!.id)
+    if (!user || !totp.enabled || !totp.secret) throw new HttpError(400, 'Two-factor authentication is not enabled')
+    if (!(await verifyPassword(password, user.passwordHash))) throw new HttpError(401, 'Incorrect password')
+    const step = verifyTotp(totp.secret, code)
+    if (step === undefined || !(await userRepo.consumeTotpStep(req.user!.id, step))) throw new HttpError(401, 'Invalid or already-used two-factor code')
+    await userRepo.disableTotp(req.user!.id)
+    res.json({ ok: true })
+  }))
 
   return router
 }

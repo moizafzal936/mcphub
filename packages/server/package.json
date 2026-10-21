@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "NODE_ENV=test node --import tsx --test --test-concurrency=1 \"test/**/*.test.ts\"",
     "assign-orphans": "tsx src/cli/assign-orphans.ts",
-    "rotate-key": "tsx src/cli/rotate-key.ts"
+    "rotate-key": "tsx src/cli/rotate-key.ts",
+    "reset-password": "tsx src/cli/reset-password.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.14.0",

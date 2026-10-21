@@ -151,6 +151,10 @@ export async function migrate(): Promise<{ encryptedLegacySecrets: number; orpha
   if (!appCols.has('owner_id')) await db.execute('ALTER TABLE apps ADD COLUMN owner_id TEXT')
   if (!appCols.has('rate_limit_per_min')) await db.execute('ALTER TABLE apps ADD COLUMN rate_limit_per_min INTEGER')
   await db.execute('CREATE INDEX IF NOT EXISTS idx_apps_owner ON apps(owner_id)')
+  const userCols = await columns('users')
+  if (!userCols.has('totp_secret')) await db.execute('ALTER TABLE users ADD COLUMN totp_secret TEXT')
+  if (!userCols.has('totp_enabled')) await db.execute('ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0')
+  if (!userCols.has('totp_last_step')) await db.execute('ALTER TABLE users ADD COLUMN totp_last_step INTEGER')
   const tokenCols = await columns('mcp_tokens')
   if (!tokenCols.has('kind')) await db.execute("ALTER TABLE mcp_tokens ADD COLUMN kind TEXT NOT NULL DEFAULT 'api'")
   if (!tokenCols.has('grant_id')) await db.execute('ALTER TABLE mcp_tokens ADD COLUMN grant_id TEXT')
@@ -185,6 +189,45 @@ export const userRepo = {
     const res = await getDb().execute({ sql: 'SELECT id, email, created_at FROM users WHERE id = ?', args: [id] })
     const r = res.rows[0]
     return r ? { id: String(r.id), email: String(r.email), createdAt: Number(r.created_at) } : undefined
+  },
+
+  async getTotp(userId: string): Promise<{ secret?: string; enabled: boolean }> {
+    const res = await getDb().execute({ sql: 'SELECT totp_secret, totp_enabled FROM users WHERE id = ?', args: [userId] })
+    const r = res.rows[0]
+    if (!r) return { enabled: false }
+    return {
+      secret: r.totp_secret == null ? undefined : decryptSecret(String(r.totp_secret), `totp:${userId}`),
+      enabled: Number(r.totp_enabled) === 1,
+    }
+  },
+
+  async setTotpPending(userId: string, secret: string): Promise<void> {
+    await getDb().execute({
+      sql: 'UPDATE users SET totp_secret = ?, totp_enabled = 0, totp_last_step = NULL WHERE id = ?',
+      args: [encryptSecret(secret, `totp:${userId}`), userId],
+    })
+  },
+
+  /** Records a used TOTP step; false if that step (or a later one) was already used (replay). */
+  async consumeTotpStep(userId: string, step: number, enable = false): Promise<boolean> {
+    const res = await getDb().execute({
+      sql: `UPDATE users SET totp_last_step = ?${enable ? ', totp_enabled = 1' : ''}
+            WHERE id = ? AND (totp_last_step IS NULL OR totp_last_step < ?)`,
+      args: [step, userId, step],
+    })
+    return res.rowsAffected === 1
+  },
+
+  async disableTotp(userId: string): Promise<void> {
+    await getDb().execute({ sql: 'UPDATE users SET totp_secret = NULL, totp_enabled = 0, totp_last_step = NULL WHERE id = ?', args: [userId] })
+  },
+
+  /** Sets a new password and signs the user out everywhere. */
+  async resetPassword(userId: string, passwordHash: string): Promise<void> {
+    await getDb().batch([
+      { sql: 'UPDATE users SET password_hash = ? WHERE id = ?', args: [passwordHash, userId] },
+      { sql: 'DELETE FROM sessions WHERE user_id = ?', args: [userId] },
+    ], 'write')
   },
 
   /** The operator is the first account created on this server. */

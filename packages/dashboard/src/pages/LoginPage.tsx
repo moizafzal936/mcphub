@@ -14,6 +14,8 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
+  const [needCode, setNeedCode] = useState(false)
+  const [code, setCode] = useState('')
   const [err, setErr] = useState('')
 
   const rawNext = params.get('next') ?? '/dashboard'
@@ -33,11 +35,17 @@ export default function LoginPage() {
     setErr('')
     setBusy(true)
     try {
-      const user = mode === 'login' ? await api.auth.login(email, password) : await api.auth.register(email, password)
+      const user = mode === 'login' ? await api.auth.login(email, password, needCode ? code : undefined) : await api.auth.register(email, password)
       setUser(user)
       navigate(next, { replace: true })
     } catch (e: any) {
-      setErr(apiError(e))
+      if (e?.response?.data?.twoFactorRequired) {
+        setErr(needCode ? apiError(e) : '')
+        setNeedCode(true)
+        setCode('')
+      } else {
+        setErr(apiError(e))
+      }
     } finally {
       setBusy(false)
     }
@@ -74,6 +82,16 @@ export default function LoginPage() {
             />
             {mode === 'register' && <span className="text-[11px] text-gray-600">At least 10 characters</span>}
           </label>
+          {needCode && mode === 'login' && (
+            <label className="block">
+              <span className="text-xs font-medium text-gray-400">Authenticator code</span>
+              <input
+                inputMode="numeric" autoComplete="one-time-code" autoFocus maxLength={6} required placeholder="123456"
+                value={code} onChange={e => setCode(e.target.value.replace(/\D/g, ''))}
+                className="mt-1 w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm text-white font-mono tracking-widest focus:outline-none focus:ring-1 focus:ring-brand-500"
+              />
+            </label>
+          )}
           {err && <p className="text-sm text-red-400" role="alert">{err}</p>}
           <button
             type="submit" disabled={busy}

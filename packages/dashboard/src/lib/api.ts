@@ -28,6 +28,7 @@ export function apiError(err: any): string {
 export interface User {
   id: string
   email: string
+  twoFactorEnabled?: boolean
 }
 
 export interface App {
@@ -113,7 +114,11 @@ export const api = {
   auth: {
     status: () => http.get<{ signupOpen: boolean; bootstrap: boolean }>('/auth/status').then(r => r.data),
     me: () => http.get<{ user: User }>('/auth/me').then(r => r.data.user),
-    login: (email: string, password: string) => http.post<{ user: User }>('/auth/login', { email, password }).then(r => r.data.user),
+    login: (email: string, password: string, code?: string) =>
+      http.post<{ user: User }>('/auth/login', { email, password, ...(code ? { code } : {}) }).then(r => r.data.user),
+    twoFactorSetup: () => http.post<{ secret: string; otpauthUrl: string }>('/auth/2fa/setup').then(r => r.data),
+    twoFactorEnable: (code: string) => http.post('/auth/2fa/enable', { code }).then(r => r.data),
+    twoFactorDisable: (password: string, code: string) => http.post('/auth/2fa/disable', { password, code }).then(r => r.data),
     register: (email: string, password: string) => http.post<{ user: User }>('/auth/register', { email, password }).then(r => r.data.user),
     logout: () => http.post('/auth/logout').then(r => r.data),
   },

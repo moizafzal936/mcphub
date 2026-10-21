@@ -100,10 +100,19 @@ function buildMcpServer(appId: string, appName: string, userId: string): Server 
     if (!app) return { tools: [] }
     const tools = await toolRepo.findEnabledByAppId(appId)
     return {
+      // Annotations let clients auto-approve reads but confirm writes, which limits what
+      // instructions injected via upstream API responses can trigger.
       tools: tools.map(tool => ({
         name: tool.name,
         description: tool.description,
         inputSchema: buildJsonSchema(tool),
+        annotations: {
+          title: `${tool.method} ${tool.path}`,
+          readOnlyHint: tool.method === 'GET',
+          destructiveHint: tool.method === 'DELETE' || tool.method === 'PUT',
+          idempotentHint: tool.method === 'GET' || tool.method === 'PUT' || tool.method === 'DELETE',
+          openWorldHint: true,
+        },
       })),
     }
   })

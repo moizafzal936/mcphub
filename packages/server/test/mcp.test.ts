@@ -58,6 +58,7 @@ test('real MCP client: list tools and call one end-to-end with the stored creden
   const { tools } = await client.listTools()
   assert.deepEqual(tools.map(t => t.name).sort(), ['echo', 'get_item'])
   assert.deepEqual(tools.find(t => t.name === 'get_item')!.inputSchema.required, ['id'])
+  assert.equal(tools.find(t => t.name === 'get_item')!.annotations?.readOnlyHint, true)
 
   const result: any = await client.callTool({ name: 'get_item', arguments: { id: 'abc 123' } })
   assert.equal(result.isError, false)

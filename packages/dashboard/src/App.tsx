@@ -8,6 +8,7 @@ import AppDetailPage from './pages/AppDetailPage.tsx'
 import NewAppPage from './pages/NewAppPage.tsx'
 import LoginPage from './pages/LoginPage.tsx'
 import ConsentPage from './pages/ConsentPage.tsx'
+import AccountPage from './pages/AccountPage.tsx'
 
 function DashboardLayout({ children }: { children: React.ReactNode }) {
   const loc = useLocation()
@@ -34,7 +35,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
               Dashboard
             </Link>
             <div className="ml-auto flex items-center gap-3">
-              <span className="hidden sm:inline text-xs text-gray-500 truncate max-w-[180px]">{user?.email}</span>
+              <Link to="/account" className="hidden sm:inline text-xs text-gray-500 hover:text-white truncate max-w-[180px]" title="Account settings">{user?.email}</Link>
               <button
                 onClick={async () => { await logout(); navigate('/login') }}
                 className="text-gray-500 hover:text-white transition-colors p-1"
@@ -72,6 +73,7 @@ export default function App() {
           <Route path="/dashboard" element={<DashboardLayout><AppsPage /></DashboardLayout>} />
           <Route path="/apps/new" element={<DashboardLayout><NewAppPage /></DashboardLayout>} />
           <Route path="/apps/:id" element={<DashboardLayout><AppDetailPage /></DashboardLayout>} />
+          <Route path="/account" element={<DashboardLayout><AccountPage /></DashboardLayout>} />
         </Routes>
       </AuthProvider>
     </ToastProvider>

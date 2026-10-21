@@ -302,6 +302,7 @@ export default function AppDetailPage() {
   const [importing, setImporting] = useState(false)
   const [liveLogs, setLiveLogs] = useState(false)
   const [showAddTool, setShowAddTool] = useState(false)
+  const [errorsOnly, setErrorsOnly] = useState(false)
   const logPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const fetchLogs = useCallback(async () => {
@@ -558,9 +559,15 @@ export default function AppDetailPage() {
       {tab === 'logs' && (
         <div>
           <div className="flex items-center justify-between mb-3">
-            <p className="text-xs text-gray-500">
-              {logs.length} calls · auto-refreshing every 2s
-            </p>
+            <div className="flex items-center gap-3">
+              <p className="text-xs text-gray-500">
+                {logs.length} calls · auto-refreshing every 2s
+              </p>
+              <label className="flex items-center gap-1 text-xs text-gray-500">
+                <input type="checkbox" checked={errorsOnly} onChange={e => setErrorsOnly(e.target.checked)} />
+                errors only
+              </label>
+            </div>
             <button
               onClick={fetchLogs}
               className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-white transition-colors"
@@ -576,18 +583,18 @@ export default function AppDetailPage() {
             </div>
           ) : (
             <div className="space-y-2">
-              {logs.map(log => (
+              {logs.filter(l => !errorsOnly || !isOk(l.statusCode)).map(log => (
                 <div key={log.id} className="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3.5">
                   <div className="flex items-center gap-3 mb-2">
-                    {log.statusCode < 400
+                    {isOk(log.statusCode)
                       ? <CheckCircle className="w-4 h-4 text-green-400 flex-shrink-0" />
                       : <XCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
                     }
                     <span className="text-sm font-semibold text-white font-mono">{log.toolName}</span>
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                      log.statusCode < 400 ? 'bg-green-950 text-green-400' : 'bg-red-950 text-red-400'
+                      isOk(log.statusCode) ? 'bg-green-950 text-green-400' : 'bg-red-950 text-red-400'
                     }`}>
-                      {log.statusCode}
+                      {log.statusCode || 'ERR'}
                     </span>
                     <span className="text-xs text-gray-600 ml-auto flex items-center gap-1">
                       <Clock className="w-3 h-3" />
@@ -597,20 +604,23 @@ export default function AppDetailPage() {
                       {new Date(log.calledAt).toLocaleTimeString()}
                     </span>
                   </div>
+                  {log.statusCode === 0 && typeof (log.output as any)?.error === 'string' && (
+                    <p className="text-xs text-red-400/90 mb-2">{(log.output as any).error}</p>
+                  )}
                   <details className="text-xs text-gray-600">
                     <summary className="cursor-pointer hover:text-gray-400 transition-colors select-none">
                       View input / output
                     </summary>
-                    <div className="mt-2 grid grid-cols-2 gap-2">
+                    <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <div>
                         <p className="text-gray-500 mb-1 font-medium">Input</p>
-                        <pre className="bg-gray-950 border border-gray-800 rounded-lg p-2.5 overflow-auto max-h-32 text-gray-400 leading-relaxed">
+                        <pre className="bg-gray-950 border border-gray-800 rounded-lg p-2.5 overflow-auto max-h-64 text-gray-400 leading-relaxed">
                           {JSON.stringify(log.input, null, 2)}
                         </pre>
                       </div>
                       <div>
                         <p className="text-gray-500 mb-1 font-medium">Output</p>
-                        <pre className="bg-gray-950 border border-gray-800 rounded-lg p-2.5 overflow-auto max-h-32 text-gray-400 leading-relaxed">
+                        <pre className="bg-gray-950 border border-gray-800 rounded-lg p-2.5 overflow-auto max-h-64 text-gray-400 leading-relaxed">
                           {JSON.stringify(log.output, null, 2)}
                         </pre>
                       </div>
@@ -624,6 +634,10 @@ export default function AppDetailPage() {
       )}
     </div>
   )
+}
+
+function isOk(status: number): boolean {
+  return status > 0 && status < 400
 }
 
 function Stat({ label, value, icon }: { label: string; value: number; icon: React.ReactNode }) {

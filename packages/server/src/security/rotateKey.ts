@@ -35,6 +35,14 @@ export async function rotateEncryptionKey(oldKeyB64: string, newKeyB64: string):
     info.client_secret = encryptSecret(decryptSecret(info.client_secret, ctx, oldKey), ctx, newKey)
     updates.push({ sql: 'UPDATE oauth_clients SET info = ? WHERE client_id = ?', args: [JSON.stringify(info), String(r.client_id)] })
   }
+  const users = await db.execute('SELECT id, totp_secret FROM users WHERE totp_secret IS NOT NULL')
+  for (const r of users.rows) {
+    const ctx = `totp:${r.id}`
+    updates.push({
+      sql: 'UPDATE users SET totp_secret = ? WHERE id = ?',
+      args: [encryptSecret(decryptSecret(String(r.totp_secret), ctx, oldKey), ctx, newKey), String(r.id)],
+    })
+  }
   if (updates.length) await db.batch(updates, 'write')
   return { secrets: updates.length, backup }
 }

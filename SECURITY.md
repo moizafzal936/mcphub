@@ -35,7 +35,7 @@ Run one instance only: MCP sessions and rate-limit counters are in process memor
 
 | Area | Control |
 |---|---|
-| Dashboard auth | Email + password (scrypt N=2^17). Session: random 256-bit token in an HttpOnly, SameSite=Lax, Secure cookie; only its SHA-256 is stored. |
+| Dashboard auth | Email + password (scrypt N=2^17), optional TOTP two-factor (RFC 6238, secret encrypted at rest, codes single-use). Session: random 256-bit token in an HttpOnly, SameSite=Lax, Secure cookie; only its SHA-256 is stored. |
 | CSRF | `Sec-Fetch-Site` + `Origin` verification on state-changing requests; no wildcard CORS. |
 | Authorization | Every app, tool, log and token query is scoped by owner/app; other users' resources return 404. |
 | MCP auth | OAuth 2.1 authorization server per the MCP spec: protected-resource metadata per app (RFC 9728), dynamic client registration, PKCE S256 only, resource indicators (RFC 8707) bound to one app the approving user owns, single-use 5-minute codes, 1-hour access tokens, rotating 30-day refresh tokens with replay detection (replay revokes the grant), `iss` in redirects (RFC 9207), client secrets encrypted at rest. Consent page requires a dashboard session. Optional static API tokens (`mcph_…`) for headless use. All tokens stored hashed and checked on every request. Streamable HTTP (`/mcp/:appId`) is stateless; legacy SSE (`/mcp/:appId/sse`) sessions are bound to app + token. `Origin` validated (DNS-rebinding defence). Tokens in query strings are rejected. Revoking a token or deleting an app closes its live SSE sessions. |
@@ -50,9 +50,12 @@ Run one instance only: MCP sessions and rate-limit counters are in process memor
 
 - Claude.ai / Claude Desktop custom connectors need a public HTTPS deployment to reach the OAuth endpoints; locally, use Claude Code or mcp-remote.
 - Dynamic client registration is open (rate-limited per IP), as MCP clients require; clients without a live grant are purged after 30 days.
-- No email verification, password reset, MFA or account lockout UI. Login rate limiting is per IP and per email.
+- No email verification or self-service password reset (both need an email provider). Operators reset passwords with
+  `npm run reset-password -w packages/server -- <email> [--disable-2fa]`, which signs the user out everywhere.
 - Single-node design: legacy SSE sessions and rate limits are in memory (Streamable HTTP itself is stateless).
-- Upstream responses are passed to the model as-is (minus the credential). Malicious API content can still attempt prompt injection against the client's model.
+- Upstream responses are passed to the model as-is (minus the credential), so API content can attempt prompt injection.
+  Tools carry MCP annotations (`readOnlyHint` for GET, `destructiveHint` for DELETE/PUT) so clients can require
+  confirmation for writes; this reduces, but cannot eliminate, the risk.
 - Dev-only tooling advisories remain (Vite 5 / esbuild dev server, Tailwind 3 dependencies). They need major-version upgrades and don't affect the production build output.
 
 ## Rotating the encryption key
@@ -68,8 +71,8 @@ one transaction (nothing changes if any check fails). Then switch `MCPHUB_ENCRYP
 
 ## Tests
 
-`npm test -w packages/server` (51 tests) covers authentication, cross-tenant authorization, CSRF, credential storage,
+`npm test -w packages/server` (54 tests) covers authentication, cross-tenant authorization, CSRF, credential storage,
 exposure and rotation, SSRF (internal targets, IPv4/IPv6 forms, DNS rebinding, redirects, proxy env), MCP token and
 session isolation, revocation, expiry and connection caps over Streamable HTTP and SSE, the OAuth flow, rate limits,
-argument validation, log redaction/retention, ownerless-app claiming and hostile (self-referencing) specs.
+argument validation, log redaction/retention, ownerless-app claiming, hostile (self-referencing) specs, TOTP two-factor and operator password reset.
 Path-containment rules for tool paths have no dedicated test file yet; the Docker image has not been built in CI.
