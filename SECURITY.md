@@ -56,7 +56,8 @@ Run one instance only: MCP sessions and rate-limit counters are in process memor
 - Upstream responses are passed to the model as-is (minus the credential), so API content can attempt prompt injection.
   Tools carry MCP annotations (`readOnlyHint` for GET, `destructiveHint` for DELETE/PUT) so clients can require
   confirmation for writes; this reduces, but cannot eliminate, the risk.
-- Dev-only tooling advisories remain (Vite 5 / esbuild dev server, Tailwind 3 dependencies). They need major-version upgrades and don't affect the production build output.
+- Dev-only advisories remain in Tailwind 3's glob/file-watching dependencies (fix needs a Tailwind 4 migration). They don't affect
+  the production build output; `npm audit --omit=dev` is clean. Vite is on 8.
 
 ## Rotating the encryption key
 

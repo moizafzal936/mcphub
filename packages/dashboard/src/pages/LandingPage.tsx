@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Zap, ArrowRight, Terminal, Globe, Shield, Layers, CheckCircle } from 'lucide-react'
 import { api } from '../lib/api.ts'
+import { useAuth } from '../components/Auth.tsx'
 
 const TYPED_STRINGS = [
   'Stripe API',
@@ -47,9 +48,12 @@ export default function LandingPage() {
   const [typeChar, setTypeChar] = useState(0)
   const [deleting, setDeleting] = useState(false)
 
+  const { user } = useAuth()
+
+  // Stats are per-account; fetching them signed-out would 401 and bounce visitors to the login page.
   useEffect(() => {
-    api.stats.get().then(setStats).catch(() => {})
-  }, [])
+    if (user) api.stats.get().then(setStats).catch(() => {})
+  }, [user])
 
   useEffect(() => {
     const target = TYPED_STRINGS[typeIdx]
