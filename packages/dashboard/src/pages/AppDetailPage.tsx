@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, RefreshCw, Zap, ToggleLeft, ToggleRight,
   Clock, CheckCircle, XCircle, Activity, Terminal, List, Radio,
-  Plus, Trash2, X, Settings, Sparkles, TerminalSquare, FileUp
+  Plus, Trash2, X, Settings, Sparkles, TerminalSquare, FileUp, Pencil
 } from 'lucide-react'
 import { api, apiError, type App, type McpTool, type ToolCallLog } from '../lib/api.ts'
 import { useToast } from '../components/Toast.tsx'
@@ -308,6 +308,7 @@ export default function AppDetailPage() {
   const [errorsOnly, setErrorsOnly] = useState(false)
   const [showCurl, setShowCurl] = useState(false)
   const [showSpec, setShowSpec] = useState(false)
+  const [editing, setEditing] = useState<{ id: string; name: string; description: string } | null>(null)
   const logPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const fetchLogs = useCallback(async () => {
@@ -367,6 +368,18 @@ export default function AppDetailPage() {
     await api.tools.toggle(app!.id, tool.id, !tool.enabled)
     setTools(ts => ts.map(t => t.id === tool.id ? { ...t, enabled: !t.enabled } : t))
     info(tool.enabled ? 'Tool disabled' : 'Tool enabled', tool.name)
+  }
+
+  async function saveEdit() {
+    if (!editing || !app) return
+    try {
+      await api.tools.updateMeta(app.id, editing.id, { name: editing.name.trim(), description: editing.description })
+      setTools(ts => ts.map(t => (t.id === editing.id ? { ...t, name: editing.name.trim(), description: editing.description } : t)))
+      success('Tool updated', editing.name.trim())
+      setEditing(null)
+    } catch (err) {
+      error('Could not update tool', apiError(err))
+    }
   }
 
   async function deleteTool(tool: McpTool) {
@@ -534,11 +547,32 @@ export default function AppDetailPage() {
                 <span className={`text-xs font-mono px-2 py-0.5 rounded-md font-bold flex-shrink-0 ${methodColor(tool.method)}`}>
                   {tool.method}
                 </span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-white">{tool.name}</p>
-                  <p className="text-xs text-gray-500 truncate">{tool.description}</p>
-                </div>
+                {editing?.id === tool.id ? (
+                  <form className="flex-1 min-w-0 space-y-2" onSubmit={e => { e.preventDefault(); saveEdit() }}>
+                    <input value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })} aria-label="Tool name"
+                      className="w-full bg-gray-950 border border-gray-800 rounded-lg px-2.5 py-1.5 text-sm text-white font-mono focus:outline-none focus:ring-1 focus:ring-brand-500" />
+                    <textarea value={editing.description} onChange={e => setEditing({ ...editing, description: e.target.value })} rows={3} maxLength={2000}
+                      aria-label="Tool description" placeholder="Explain when an AI should use this tool and what it returns"
+                      className="w-full bg-gray-950 border border-gray-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-brand-500" />
+                    <div className="flex gap-2">
+                      <button type="submit" className="text-xs bg-brand-600 hover:bg-brand-500 text-white px-3 py-1 rounded-lg">Save</button>
+                      <button type="button" onClick={() => setEditing(null)} className="text-xs text-gray-400 hover:text-white px-3 py-1">Cancel</button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-white">{tool.name}</p>
+                    <p className="text-xs text-gray-500 truncate">{tool.description}</p>
+                  </div>
+                )}
                 <code className="text-xs text-gray-700 font-mono hidden md:block flex-shrink-0">{tool.path}</code>
+                <button
+                  onClick={() => setEditing({ id: tool.id, name: tool.name, description: tool.description })}
+                  className="text-gray-600 hover:text-white transition-colors flex-shrink-0"
+                  title="Edit name and description" aria-label={`Edit ${tool.name}`}
+                >
+                  <Pencil className="w-4 h-4" />
+                </button>
                 <button
                   onClick={() => toggleTool(tool)}
                   className="text-gray-500 hover:text-white transition-colors flex-shrink-0"
