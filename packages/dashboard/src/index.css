@@ -1,0 +1,47 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gray-950 text-gray-100 antialiased;
+  }
+  * {
+    @apply scroll-smooth;
+  }
+}
+
+@layer components {
+  .input {
+    @apply w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2.5 text-sm text-white
+           placeholder-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-600
+           transition-all;
+  }
+}
+
+@layer utilities {
+  .animate-blink {
+    animation: blink 1s step-end infinite;
+  }
+  .animate-slide-in {
+    animation: slideIn 0.2s ease-out;
+  }
+  .w-4\.5 { width: 1.125rem; }
+  .h-4\.5 { height: 1.125rem; }
+  .w-4\.5 { width: 1.125rem; }
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}

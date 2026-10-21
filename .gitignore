@@ -1,0 +1,10 @@
+node_modules/
+dist/
+packages/server/data/
+*.db
+*.db-shm
+*.db-wal
+.encryption-key
+.env
+.env.*
+!.env.example
