@@ -71,7 +71,7 @@ export function FixedParamsCard({ app, onUpdated, inputClass }: { app: App; onUp
           className="flex items-center gap-1.5 border border-gray-700 text-gray-200 hover:bg-gray-800 disabled:opacity-50 px-3 py-1.5 rounded-lg text-xs font-medium">
           <Plus className="w-3.5 h-3.5" /> Add
         </button>
-        <button type="submit" disabled={saving} className="flex items-center gap-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white px-4 py-1.5 rounded-lg text-sm font-medium">
+        <button type="submit" disabled={saving} className="flex items-center gap-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-onaccent px-4 py-1.5 rounded-lg text-sm font-medium">
           {saving && <Loader2 className="w-4 h-4 animate-spin" />}
           Save
         </button>

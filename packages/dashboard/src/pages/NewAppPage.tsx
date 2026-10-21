@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, Loader2, Zap, ChevronDown, ChevronUp, Upload } from 'lucide-react'
+import { ArrowLeft, Loader2, Plug, ChevronDown, ChevronUp, Upload } from 'lucide-react'
 import { api, apiError } from '../lib/api.ts'
 import { useToast } from '../components/Toast.tsx'
 import { OAuthFields, fromOAuthForm, toOAuthForm } from '../components/OAuthFields.tsx'
@@ -359,7 +359,7 @@ export default function NewAppPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white py-3 rounded-xl font-semibold transition-all hover:scale-[1.01]"
+            className="w-full flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-onaccent py-3 rounded-xl font-semibold transition-all hover:scale-[1.01]"
           >
             {loading ? (
               <>
@@ -368,7 +368,7 @@ export default function NewAppPage() {
               </>
             ) : (
               <>
-                <Zap className="w-4 h-4" />
+                <Plug className="w-4 h-4" />
                 Generate MCP Server
               </>
             )}

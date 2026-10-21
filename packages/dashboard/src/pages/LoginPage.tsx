@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { Zap, Loader2 } from 'lucide-react'
+import { Plug, Loader2 } from 'lucide-react'
+import { Logo } from '../components/Brand.tsx'
 import { api, apiError } from '../lib/api.ts'
 import { useAuth } from '../components/Auth.tsx'
 
@@ -54,9 +55,8 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
-        <Link to="/" className="flex items-center justify-center gap-2 font-bold text-white text-lg mb-8">
-          <Zap className="w-5 h-5 text-brand-400" />
-          MCPHub
+        <Link to="/" className="flex justify-center mb-8" aria-label="MCPHub home">
+          <Logo size="lg" />
         </Link>
         <form onSubmit={submit} className="bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-4">
           <div>
@@ -95,7 +95,7 @@ export default function LoginPage() {
           {err && <p className="text-sm text-red-400" role="alert">{err}</p>}
           <button
             type="submit" disabled={busy}
-            className="w-full flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white py-2.5 rounded-lg text-sm font-medium transition-colors"
+            className="w-full flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-onaccent py-2.5 rounded-lg text-sm font-medium transition-colors"
           >
             {busy && <Loader2 className="w-4 h-4 animate-spin" />}
             {mode === 'login' ? 'Sign in' : 'Create account'}

@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fontsource-variable/plus-jakarta-sans": "^5.2.6",
     "axios": "^1.7.7",
     "lucide-react": "^0.400.0",
     "qrcode": "^1.5.4",

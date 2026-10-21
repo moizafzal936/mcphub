@@ -62,7 +62,7 @@ export function PlaygroundPanel({ app }: { app: App }) {
         )}
         {turns.map((t, i) => (
           <div key={i} className={t.role === 'user' ? 'flex justify-end' : ''}>
-            <div className={`max-w-[85%] rounded-xl px-4 py-2.5 text-sm whitespace-pre-wrap ${t.role === 'user' ? 'bg-brand-600 text-white' : 'bg-gray-950 border border-gray-800 text-gray-200'}`}>
+            <div className={`max-w-[85%] rounded-xl px-4 py-2.5 text-sm whitespace-pre-wrap ${t.role === 'user' ? 'bg-brand-600 text-onaccent' : 'bg-gray-950 border border-gray-800 text-gray-200'}`}>
               {t.steps && t.steps.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mb-2">
                   {t.steps.map((s, j) => (
@@ -86,7 +86,7 @@ export function PlaygroundPanel({ app }: { app: App }) {
           placeholder={`e.g. "Show me 3 available pets"`} aria-label="Message"
           className="flex-1 bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-brand-500" />
         <button type="submit" disabled={busy || !input.trim()} aria-label="Send"
-          className="flex items-center gap-1.5 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium">
+          className="flex items-center gap-1.5 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-onaccent px-4 py-2 rounded-lg text-sm font-medium">
           <Send className="w-4 h-4" />
         </button>
       </form>

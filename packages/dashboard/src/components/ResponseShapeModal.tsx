@@ -111,7 +111,7 @@ export function ResponseShapeModal({ appId, tool, sample, onClose, onSaved }: {
           <button onClick={onClose} className="text-xs text-gray-400 hover:text-white px-3 py-1.5">Cancel</button>
           <button
             onClick={() => save([...chosen])} disabled={saving || chosen.size === 0}
-            className="flex items-center gap-1.5 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white text-xs font-medium px-4 py-1.5 rounded-lg"
+            className="flex items-center gap-1.5 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-onaccent text-xs font-medium px-4 py-1.5 rounded-lg"
           >
             {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
             Save

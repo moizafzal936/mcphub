@@ -166,7 +166,7 @@ export function ToolTester({ appId, tools, onToolUpdated }: ToolTesterProps) {
                       placeholder={param.description || param.name}
                       value={args[param.name] ?? ''}
                       onChange={e => setArgs(a => ({ ...a, [param.name]: e.target.value }))}
-                      className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-700 focus:outline-none focus:ring-1 focus:ring-brand-500 font-mono"
+                      className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-brand-500 font-mono"
                     />
                   </div>
                 ))
@@ -178,7 +178,7 @@ export function ToolTester({ appId, tools, onToolUpdated }: ToolTesterProps) {
               <button
                 onClick={execute}
                 disabled={running}
-                className="w-full flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white py-2.5 rounded-lg text-sm font-medium transition-colors"
+                className="w-full flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-onaccent py-2.5 rounded-lg text-sm font-medium transition-colors"
               >
                 {running
                   ? <><Loader2 className="w-4 h-4 animate-spin" /> Running...</>

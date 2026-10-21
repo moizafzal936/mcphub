@@ -72,7 +72,7 @@ export default function AccountPage() {
         </p>
 
         {!enabled && !setup && (
-          <button onClick={start} disabled={busy} className="flex items-center gap-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium">
+          <button onClick={start} disabled={busy} className="flex items-center gap-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-onaccent px-4 py-2 rounded-lg text-sm font-medium">
             {busy && <Loader2 className="w-4 h-4 animate-spin" />}
             Set up two-factor
           </button>
@@ -81,7 +81,7 @@ export default function AccountPage() {
         {!enabled && setup && (
           <div className="space-y-3">
             <p className="text-sm text-gray-400">1. Scan this with your authenticator app:</p>
-            <img src={setup.qr} alt="Two-factor setup QR code" className="w-48 h-48 rounded-lg bg-white p-1" />
+            <img src={setup.qr} alt="Two-factor setup QR code" className="w-48 h-48 rounded-lg bg-paper p-1" />
             <p className="text-xs text-gray-500">
               Or enter this key manually: <code className="font-mono text-gray-300 break-all">{setup.secret}</code>
             </p>
@@ -98,7 +98,7 @@ export default function AccountPage() {
             <input inputMode="numeric" autoComplete="one-time-code" placeholder="123456" aria-label="Authenticator code" maxLength={6}
               value={code} onChange={e => setCode(e.target.value.replace(/\D/g, ''))} required className={`${inputCls} font-mono tracking-widest`} />
             <button type="submit" disabled={busy || code.length !== 6}
-              className={`flex items-center gap-2 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium ${enabled ? 'bg-red-700 hover:bg-red-600' : 'bg-brand-600 hover:bg-brand-500'}`}>
+              className={`flex items-center gap-2 disabled:opacity-50 text-onaccent px-4 py-2 rounded-lg text-sm font-medium ${enabled ? 'bg-red-700 hover:bg-red-600' : 'bg-brand-600 hover:bg-brand-500'}`}>
               {busy && <Loader2 className="w-4 h-4 animate-spin" />}
               {enabled ? 'Turn off two-factor' : 'Verify and turn on'}
             </button>

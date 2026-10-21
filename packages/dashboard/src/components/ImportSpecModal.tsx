@@ -60,7 +60,7 @@ export function ImportSpecModal({ app, onClose, onImported }: { app: App; onClos
           <textarea value={text} onChange={e => setText(e.target.value)} rows={6} spellCheck={false} aria-label="Spec text"
             placeholder="…or paste an OpenAPI spec or Postman collection here" className={`${field} font-mono text-xs`} />
           {err && <p className="text-sm text-red-400" role="alert">{err}</p>}
-          <button type="submit" disabled={busy || (!text.trim() && !url.trim())} className="w-full flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white py-2.5 rounded-xl text-sm font-medium">
+          <button type="submit" disabled={busy || (!text.trim() && !url.trim())} className="w-full flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-onaccent py-2.5 rounded-xl text-sm font-medium">
             {busy && <Loader2 className="w-4 h-4 animate-spin" />}
             Import and replace tools
           </button>

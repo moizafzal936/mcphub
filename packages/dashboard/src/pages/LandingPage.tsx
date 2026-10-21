@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Zap, ArrowRight, Terminal, Globe, Shield, Layers, Activity, KeyRound, Gauge, Scissors } from 'lucide-react'
+import { Plug, ArrowRight, Terminal, Globe, Shield, Layers, Activity, KeyRound, Gauge, Scissors } from 'lucide-react'
+import { Logo, ThemeToggle } from '../components/Brand.tsx'
 import { api } from '../lib/api.ts'
 import { useAuth } from '../components/Auth.tsx'
 
@@ -36,7 +37,7 @@ const STEPS = [
 const FEATURES = [
   { icon: Globe, title: 'Any REST API', desc: 'OpenAPI (URL, file or paste), Postman collections, curl examples or hand-written tools. Export an app and import it on another server.' },
   { icon: KeyRound, title: 'Any auth scheme', desc: 'API keys in a header or query string, OAuth 2.0 client credentials with automatic token refresh, and fixed headers such as API versions or a second key.' },
-  { icon: Zap, title: 'One-click connect', desc: 'Standard MCP OAuth sign-in for Claude, Claude Code and Cursor, plus revocable access tokens for scripts.' },
+  { icon: Plug, title: 'One-click connect', desc: 'Standard MCP OAuth sign-in for Claude, Claude Code and Cursor, plus revocable access tokens for scripts.' },
   { icon: Gauge, title: 'AI-readiness score', desc: 'Flags vague or generated descriptions, look-alike tools, undocumented parameters and oversized tool lists, and lets you fix each one in place.' },
   { icon: Scissors, title: 'Responses sized for AI', desc: 'Pick the fields the model actually needs from a real response. A book search went from 9,901 to 709 characters, 93% fewer tokens.' },
   { icon: Shield, title: 'Secure by default', desc: 'Encrypted secrets that AI clients never see, SSRF protection, rate limits, redacted logs and optional two-factor sign-in.' },
@@ -85,20 +86,20 @@ export default function LandingPage() {
       {/* Nav */}
       <nav className="border-b border-gray-900 sticky top-0 z-40 bg-gray-950/80 backdrop-blur">
         <div className="max-w-6xl mx-auto px-4 h-14 flex items-center gap-3 sm:gap-6">
-          <Link to="/" className="flex items-center gap-2 font-bold text-lg">
-            <Zap className="w-5 h-5 text-brand-400" />
-            MCPHub
+          <Link to="/" aria-label="MCPHub home">
+            <Logo />
           </Link>
           <span className="text-xs bg-brand-900 text-brand-300 border border-brand-800 px-2 py-0.5 rounded-full font-medium">
             Beta
           </span>
           <div className="ml-auto flex items-center gap-3">
+            <ThemeToggle />
             <Link to="/dashboard" className="text-sm text-gray-400 hover:text-white transition-colors">
               Dashboard
             </Link>
             <Link
               to="/apps/new"
-              className="flex items-center gap-1.5 bg-brand-600 hover:bg-brand-500 text-white px-3 sm:px-4 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors"
+              className="flex items-center gap-1.5 bg-brand-600 hover:bg-brand-500 text-onaccent px-3 sm:px-4 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors"
             >
               Get started <ArrowRight className="w-3.5 h-3.5" />
             </Link>
@@ -108,7 +109,7 @@ export default function LandingPage() {
 
       {/* Hero */}
       <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-brand-950/50 via-gray-950 to-purple-950/30 pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-br from-brand-950 via-gray-950 to-green-950/70 pointer-events-none" />
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-brand-600/10 blur-[120px] rounded-full pointer-events-none" />
 
         <div className="relative max-w-4xl mx-auto px-4 pt-24 pb-20 text-center">
@@ -120,7 +121,7 @@ export default function LandingPage() {
           <h1 className="text-5xl md:text-6xl font-extrabold tracking-tight mb-6 leading-tight">
             Make{' '}
             <span className="relative inline-block">
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-400 to-purple-400">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-500 to-green-400">
                 {currentText}
                 <span className="animate-blink text-brand-400">|</span>
               </span>
@@ -137,9 +138,9 @@ export default function LandingPage() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link
               to="/apps/new"
-              className="flex items-center gap-2 bg-brand-600 hover:bg-brand-500 text-white px-7 py-3 rounded-xl font-semibold text-base transition-all hover:scale-105 shadow-lg shadow-brand-900/50"
+              className="flex items-center gap-2 bg-brand-600 hover:bg-brand-500 text-onaccent px-7 py-3 rounded-xl font-semibold text-base transition-all hover:scale-105 shadow-lg shadow-brand-900/50"
             >
-              <Zap className="w-5 h-5" />
+              <Plug className="w-5 h-5" />
               Connect your first API
             </Link>
             <Link
@@ -201,7 +202,7 @@ export default function LandingPage() {
         <div className="grid md:grid-cols-3 gap-6">
           {STEPS.map(step => (
             <div key={step.num} className="bg-gray-900 border border-gray-800 rounded-2xl p-6 relative overflow-hidden group hover:border-gray-700 transition-colors">
-              <div className="absolute -top-4 -right-4 text-8xl font-black text-gray-800/50 select-none group-hover:text-gray-700/50 transition-colors">
+              <div className="absolute -top-4 -right-4 text-8xl font-black text-gray-600/50 select-none group-hover:text-gray-600/50 transition-colors">
                 {step.num}
               </div>
               <p className="text-xs font-mono text-brand-400 mb-3">{step.num}</p>
@@ -235,16 +236,16 @@ export default function LandingPage() {
 
       {/* CTA */}
       <section className="max-w-3xl mx-auto px-4 pb-24 text-center">
-        <div className="bg-gradient-to-br from-brand-950 to-purple-950/50 border border-brand-800/50 rounded-3xl p-12">
+        <div className="bg-gradient-to-br from-brand-950 to-green-950 border border-brand-800/60 rounded-3xl p-12">
           <h2 className="text-3xl font-bold mb-4">Ready to make your API AI-native?</h2>
           <p className="text-gray-400 mb-8">
             Bring a spec, a Postman collection or a single curl command. Your keys stay encrypted on your MCPHub server; the AI only ever sees the tools.
           </p>
           <Link
             to="/apps/new"
-            className="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-500 text-white px-8 py-3.5 rounded-xl font-semibold text-base transition-all hover:scale-105 shadow-lg shadow-brand-900/50"
+            className="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-500 text-onaccent px-8 py-3.5 rounded-xl font-semibold text-base transition-all hover:scale-105 shadow-lg shadow-brand-900/50"
           >
-            <Zap className="w-5 h-5" />
+            <Plug className="w-5 h-5" />
             Connect your first API
           </Link>
         </div>
@@ -252,10 +253,7 @@ export default function LandingPage() {
 
       <footer className="border-t border-gray-900 py-8">
         <div className="max-w-6xl mx-auto px-4 flex items-center justify-between text-sm text-gray-600">
-          <div className="flex items-center gap-2">
-            <Zap className="w-4 h-4 text-brand-600" />
-            MCPHub
-          </div>
+          <Logo size="sm" />
           <p>Built on the Model Context Protocol by Anthropic</p>
         </div>
       </footer>

@@ -1,10 +1,225 @@
+@import '@fontsource-variable/plus-jakarta-sans';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Theme tokens. Light ("sage") is the default; [data-theme="dark"] is the optional dark variant.
+ * Values are RGB channels so Tailwind opacity modifiers (bg-brand-950/50) keep working.
+ */
 @layer base {
+  :root {
+    color-scheme: light;
+    --ink: 15 33 22;
+    --gray-50: 19 38 26;
+    --gray-100: 26 46 34;
+    --gray-200: 37 58 45;
+    --gray-300: 52 72 60;
+    --gray-400: 74 93 81;
+    --gray-500: 99 118 106;
+    --gray-600: 125 142 131;
+    --gray-700: 203 214 206;
+    --gray-800: 227 234 228;
+    --gray-900: 255 255 255;
+    --gray-950: 244 247 243;
+    --brand-50: 15 42 27;
+    --brand-100: 20 53 34;
+    --brand-200: 26 74 46;
+    --brand-300: 31 90 55;
+    --brand-400: 35 112 63;
+    --brand-500: 42 127 72;
+    --brand-600: 30 107 60;
+    --brand-700: 156 203 169;
+    --brand-800: 191 224 199;
+    --brand-900: 215 238 220;
+    --brand-950: 234 246 236;
+    --green-50: 31 51 8;
+    --green-100: 42 68 11;
+    --green-200: 52 84 14;
+    --green-300: 63 101 16;
+    --green-400: 77 124 15;
+    --green-500: 91 143 20;
+    --green-600: 77 124 15;
+    --green-700: 169 212 102;
+    --green-800: 203 231 154;
+    --green-900: 221 239 180;
+    --green-950: 240 248 220;
+    --red-50: 69 10 10;
+    --red-100: 127 29 29;
+    --red-200: 153 27 27;
+    --red-300: 153 27 27;
+    --red-400: 185 28 28;
+    --red-500: 220 38 38;
+    --red-600: 185 28 28;
+    --red-700: 252 165 165;
+    --red-800: 254 202 202;
+    --red-900: 254 202 202;
+    --red-950: 254 242 242;
+    --amber-50: 69 26 3;
+    --amber-100: 120 53 15;
+    --amber-200: 146 64 14;
+    --amber-300: 146 64 14;
+    --amber-400: 180 83 9;
+    --amber-500: 217 119 6;
+    --amber-600: 180 83 9;
+    --amber-700: 252 211 77;
+    --amber-800: 253 230 138;
+    --amber-900: 253 230 138;
+    --amber-950: 255 251 235;
+    --yellow-50: 66 32 6;
+    --yellow-100: 113 63 18;
+    --yellow-200: 133 77 14;
+    --yellow-300: 133 77 14;
+    --yellow-400: 161 98 7;
+    --yellow-500: 202 138 4;
+    --yellow-600: 161 98 7;
+    --yellow-700: 253 224 71;
+    --yellow-800: 254 240 138;
+    --yellow-900: 254 240 138;
+    --yellow-950: 254 252 232;
+    --orange-50: 67 20 7;
+    --orange-100: 124 45 18;
+    --orange-200: 154 52 18;
+    --orange-300: 154 52 18;
+    --orange-400: 194 65 12;
+    --orange-500: 234 88 12;
+    --orange-600: 194 65 12;
+    --orange-700: 253 186 116;
+    --orange-800: 254 215 170;
+    --orange-900: 254 215 170;
+    --orange-950: 255 247 237;
+    --blue-50: 23 37 84;
+    --blue-100: 30 58 138;
+    --blue-200: 30 64 175;
+    --blue-300: 30 64 175;
+    --blue-400: 29 78 216;
+    --blue-500: 37 99 235;
+    --blue-600: 29 78 216;
+    --blue-700: 147 197 253;
+    --blue-800: 191 219 254;
+    --blue-900: 191 219 254;
+    --blue-950: 239 246 255;
+    --purple-50: 59 7 100;
+    --purple-100: 88 28 135;
+    --purple-200: 107 33 168;
+    --purple-300: 107 33 168;
+    --purple-400: 126 34 206;
+    --purple-500: 147 51 234;
+    --purple-600: 126 34 206;
+    --purple-700: 216 180 254;
+    --purple-800: 233 213 255;
+    --purple-900: 233 213 255;
+    --purple-950: 250 245 255;
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --ink: 255 255 255;
+    --gray-50: 244 248 245;
+    --gray-100: 233 239 234;
+    --gray-200: 218 227 220;
+    --gray-300: 197 209 200;
+    --gray-400: 166 181 170;
+    --gray-500: 131 149 137;
+    --gray-600: 114 133 120;
+    --gray-700: 54 70 60;
+    --gray-800: 38 51 43;
+    --gray-900: 24 35 28;
+    --gray-950: 17 26 21;
+    --brand-50: 242 251 230;
+    --brand-100: 226 245 200;
+    --brand-200: 203 236 158;
+    --brand-300: 178 224 122;
+    --brand-400: 152 212 90;
+    --brand-500: 63 154 92;
+    --brand-600: 47 130 80;
+    --brand-700: 42 107 69;
+    --brand-800: 35 86 58;
+    --brand-900: 27 64 44;
+    --brand-950: 20 48 31;
+    --green-50: 240 253 244;
+    --green-100: 220 252 231;
+    --green-200: 187 247 208;
+    --green-300: 134 239 172;
+    --green-400: 74 222 128;
+    --green-500: 34 197 94;
+    --green-600: 22 163 74;
+    --green-700: 21 128 61;
+    --green-800: 22 101 52;
+    --green-900: 20 83 45;
+    --green-950: 5 46 22;
+    --red-50: 254 242 242;
+    --red-100: 254 226 226;
+    --red-200: 254 202 202;
+    --red-300: 252 165 165;
+    --red-400: 248 113 113;
+    --red-500: 239 68 68;
+    --red-600: 220 38 38;
+    --red-700: 185 28 28;
+    --red-800: 153 27 27;
+    --red-900: 127 29 29;
+    --red-950: 69 10 10;
+    --amber-50: 255 251 235;
+    --amber-100: 254 243 199;
+    --amber-200: 253 230 138;
+    --amber-300: 252 211 77;
+    --amber-400: 251 191 36;
+    --amber-500: 245 158 11;
+    --amber-600: 217 119 6;
+    --amber-700: 180 83 9;
+    --amber-800: 146 64 14;
+    --amber-900: 120 53 15;
+    --amber-950: 69 26 3;
+    --yellow-50: 254 252 232;
+    --yellow-100: 254 249 195;
+    --yellow-200: 254 240 138;
+    --yellow-300: 253 224 71;
+    --yellow-400: 250 204 21;
+    --yellow-500: 234 179 8;
+    --yellow-600: 202 138 4;
+    --yellow-700: 161 98 7;
+    --yellow-800: 133 77 14;
+    --yellow-900: 113 63 18;
+    --yellow-950: 66 32 6;
+    --orange-50: 255 247 237;
+    --orange-100: 255 237 213;
+    --orange-200: 254 215 170;
+    --orange-300: 253 186 116;
+    --orange-400: 251 146 60;
+    --orange-500: 249 115 22;
+    --orange-600: 234 88 12;
+    --orange-700: 194 65 12;
+    --orange-800: 154 52 18;
+    --orange-900: 124 45 18;
+    --orange-950: 67 20 7;
+    --blue-50: 239 246 255;
+    --blue-100: 219 234 254;
+    --blue-200: 191 219 254;
+    --blue-300: 147 197 253;
+    --blue-400: 96 165 250;
+    --blue-500: 59 130 246;
+    --blue-600: 37 99 235;
+    --blue-700: 29 78 216;
+    --blue-800: 30 64 175;
+    --blue-900: 30 58 138;
+    --blue-950: 23 37 84;
+    --purple-50: 250 245 255;
+    --purple-100: 243 232 255;
+    --purple-200: 233 213 255;
+    --purple-300: 216 180 254;
+    --purple-400: 192 132 252;
+    --purple-500: 168 85 247;
+    --purple-600: 147 51 234;
+    --purple-700: 126 34 206;
+    --purple-800: 107 33 168;
+    --purple-900: 88 28 135;
+    --purple-950: 59 7 100;
+  }
   body {
-    @apply bg-gray-950 text-gray-100 antialiased;
+    @apply bg-gray-950 text-gray-100 antialiased font-sans;
+  }
+  ::selection {
+    @apply bg-brand-900 text-white;
   }
   * {
     @apply scroll-smooth;
@@ -14,7 +229,7 @@
 @layer components {
   .input {
     @apply w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2.5 text-sm text-white
-           placeholder-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-600
+           placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-600
            transition-all;
   }
 }

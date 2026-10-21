@@ -132,7 +132,7 @@ export function SettingsPanel({ app, onUpdated }: { app: App; onUpdated: (app: A
           <span className="text-xs font-medium text-gray-400">Rate limit (tool calls per minute)</span>
           <input value={rate} onChange={e => setRate(e.target.value)} inputMode="numeric" placeholder="Server default" className={`mt-1 ${inputCls}`} />
         </label>
-        <button type="submit" disabled={busy !== null} className="flex items-center gap-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium">
+        <button type="submit" disabled={busy !== null} className="flex items-center gap-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-onaccent px-4 py-2 rounded-lg text-sm font-medium">
           {busy === 'save' && <Loader2 className="w-4 h-4 animate-spin" />}
           Save settings
         </button>
@@ -186,7 +186,7 @@ export function SettingsPanel({ app, onUpdated }: { app: App; onUpdated: (app: A
             : <>"Authorization" sends <code>Bearer &lt;key&gt;</code>; any other header (e.g. X-API-Key) sends the key as-is.</>}
         </p>
         </>)}
-        <button type="submit" disabled={busy !== null} className="flex items-center gap-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium">
+        <button type="submit" disabled={busy !== null} className="flex items-center gap-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-onaccent px-4 py-2 rounded-lg text-sm font-medium">
           {busy === 'auth' && <Loader2 className="w-4 h-4 animate-spin" />}
           Save authentication
         </button>
@@ -226,7 +226,7 @@ export function SettingsPanel({ app, onUpdated }: { app: App; onUpdated: (app: A
           <button
             onClick={() => save({ apiKey: newKey }, 'key', app.hasApiKey ? `${usesOAuth ? 'Client secret' : 'API key'} replaced` : `${usesOAuth ? 'Client secret' : 'API key'} saved`)}
             disabled={!newKey || busy !== null}
-            className="flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap"
+            className="flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-onaccent px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap"
           >
             {busy === 'key' && <Loader2 className="w-4 h-4 animate-spin" />}
             {app.hasApiKey ? 'Replace' : 'Save'}

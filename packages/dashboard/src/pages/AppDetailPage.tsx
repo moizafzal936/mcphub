@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  ArrowLeft, RefreshCw, Zap, ToggleLeft, ToggleRight,
+  ArrowLeft, RefreshCw, Plug, ToggleLeft, ToggleRight,
   Clock, CheckCircle, XCircle, Activity, Terminal, List, Radio,
   Plus, Trash2, X, Settings, Sparkles, TerminalSquare, FileUp, Pencil
 } from 'lucide-react'
@@ -49,7 +49,7 @@ function ActivityChart({ logs }: { logs: ToolCallLog[] }) {
           />
         ))}
       </div>
-      <div className="flex justify-between mt-2 text-[10px] text-gray-700">
+      <div className="flex justify-between mt-2 text-[10px] text-gray-600">
         <span>24h ago</span>
         <span>now</span>
       </div>
@@ -196,7 +196,7 @@ function AddToolModal({ appId, onClose, onAdded }: {
               </button>
             </div>
             {queryParams.length === 0 && (
-              <p className="text-xs text-gray-700 italic">
+              <p className="text-xs text-gray-600 italic">
                 Query (?status=available), header, or JSON body fields (POST/PUT/PATCH) — click Add above
               </p>
             )}
@@ -210,7 +210,7 @@ function AddToolModal({ appId, onClose, onAdded }: {
                       aria-label="Parameter name"
                       value={param.name}
                       onChange={e => updateQueryParam(i, 'name', e.target.value)}
-                      className="flex-1 min-w-0 bg-gray-950 border border-gray-800 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-gray-700 focus:outline-none focus:ring-1 focus:ring-brand-500 font-mono"
+                      className="flex-1 min-w-0 bg-gray-950 border border-gray-800 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-brand-500 font-mono"
                     />
                     <select
                       aria-label="Parameter location"
@@ -249,7 +249,7 @@ function AddToolModal({ appId, onClose, onAdded }: {
                       aria-label="Parameter description"
                       value={param.description}
                       onChange={e => updateQueryParam(i, 'description', e.target.value)}
-                      className="flex-1 min-w-0 bg-gray-950 border border-gray-800 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-gray-700 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      className="flex-1 min-w-0 bg-gray-950 border border-gray-800 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-brand-500"
                     />
                     <label className="flex items-center gap-1 text-[11px] text-gray-500 flex-shrink-0">
                       <input
@@ -272,7 +272,7 @@ function AddToolModal({ appId, onClose, onAdded }: {
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white py-2.5 rounded-xl text-sm font-medium transition-colors"
+              className="flex-1 flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-onaccent py-2.5 rounded-xl text-sm font-medium transition-colors"
             >
               {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
               Add Tool
@@ -466,7 +466,7 @@ export default function AppDetailPage() {
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div className="w-9 h-9 flex-shrink-0 bg-brand-950 border border-brand-900 rounded-xl flex items-center justify-center">
-          <Zap className="w-4 h-4 text-brand-400" />
+          <Plug className="w-4 h-4 text-brand-400" />
         </div>
         <div className="min-w-0 flex-1">
           <h1 className="text-xl font-bold text-white leading-tight flex flex-wrap items-center gap-x-2">
@@ -501,7 +501,7 @@ export default function AppDetailPage() {
       {/* Tabs: scroll sideways on narrow screens instead of widening the page */}
       <div className="flex border-b border-gray-800 mb-5 gap-0 overflow-x-auto [scrollbar-width:none]">
         {([
-          { key: 'connect', label: 'Connect', icon: Zap },
+          { key: 'connect', label: 'Connect', icon: Plug },
           { key: 'tools', label: `Tools (${tools.length})`, icon: List },
           { key: 'test', label: 'Test', icon: Terminal },
           { key: 'playground', label: 'Playground', icon: Sparkles },
@@ -644,7 +644,7 @@ export default function AppDetailPage() {
                       </div>
                     )}
                     <div className="flex gap-2">
-                      <button type="submit" className="text-xs bg-brand-600 hover:bg-brand-500 text-white px-3 py-1 rounded-lg">Save</button>
+                      <button type="submit" className="text-xs bg-brand-600 hover:bg-brand-500 text-onaccent px-3 py-1 rounded-lg">Save</button>
                       <button type="button" onClick={() => setEditing(null)} className="text-xs text-gray-400 hover:text-white px-3 py-1">Cancel</button>
                     </div>
                   </form>
@@ -663,7 +663,7 @@ export default function AppDetailPage() {
                     <p className="text-xs text-gray-500 truncate">{tool.description}</p>
                   </div>
                 )}
-                <code className="text-xs text-gray-700 font-mono hidden md:block flex-shrink-0">{tool.path}</code>
+                <code className="text-xs text-gray-600 font-mono hidden md:block flex-shrink-0">{tool.path}</code>
                 <button
                   onClick={() => startEdit(tool)}
                   className="text-gray-600 hover:text-white transition-colors flex-shrink-0"
@@ -683,7 +683,7 @@ export default function AppDetailPage() {
                 </button>
                 <button
                   onClick={() => deleteTool(tool)}
-                  className="text-gray-700 hover:text-red-400 transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
+                  className="text-gray-600 hover:text-red-400 transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
                   title="Delete tool"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -760,7 +760,7 @@ export default function AppDetailPage() {
                       <Clock className="w-3 h-3" />
                       {log.durationMs}ms
                     </span>
-                    <span className="text-xs text-gray-700">
+                    <span className="text-xs text-gray-600">
                       {new Date(log.calledAt).toLocaleTimeString()}
                     </span>
                   </div>

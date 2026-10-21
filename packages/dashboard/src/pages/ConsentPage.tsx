@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Zap, Loader2, ShieldCheck, ExternalLink } from 'lucide-react'
+import { Plug, Loader2, ShieldCheck, ExternalLink } from 'lucide-react'
+import { Logo } from '../components/Brand.tsx'
 import { api, apiError, type ConsentRequest } from '../lib/api.ts'
 import { useAuth } from '../components/Auth.tsx'
 
@@ -34,9 +35,8 @@ export default function ConsentPage() {
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-md">
-        <div className="flex items-center justify-center gap-2 font-bold text-white text-lg mb-8">
-          <Zap className="w-5 h-5 text-brand-400" />
-          MCPHub
+        <div className="flex justify-center mb-8">
+          <Logo size="lg" />
         </div>
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
           {err ? (
@@ -72,7 +72,7 @@ export default function ConsentPage() {
                 </button>
                 <button
                   onClick={() => decide(true)} disabled={busy !== null}
-                  className="flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white disabled:opacity-50"
+                  className="flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-onaccent disabled:opacity-50"
                 >
                   {busy === 'approve' && <Loader2 className="w-4 h-4 animate-spin" />}
                   Allow access

@@ -181,7 +181,7 @@ export function ConnectPanel({ app, mcpUrl }: { app: App; mcpUrl: string }) {
           />
           <button
             onClick={create} disabled={busy}
-            className="flex items-center justify-center gap-1.5 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium"
+            className="flex items-center justify-center gap-1.5 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-onaccent px-4 py-2 rounded-lg text-sm font-medium"
           >
             {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
             Create token

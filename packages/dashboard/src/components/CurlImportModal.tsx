@@ -50,7 +50,7 @@ export function CurlImportModal({ app, onClose, onAdded }: { app: App; onClose: 
             className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm text-white font-mono focus:outline-none focus:ring-1 focus:ring-brand-500"
           />
           {err && <p className="text-sm text-red-400" role="alert">{err}</p>}
-          <button type="submit" disabled={busy || !curl.trim()} className="w-full flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white py-2.5 rounded-xl text-sm font-medium">
+          <button type="submit" disabled={busy || !curl.trim()} className="w-full flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-onaccent py-2.5 rounded-xl text-sm font-medium">
             {busy && <Loader2 className="w-4 h-4 animate-spin" />}
             Create tool
           </button>

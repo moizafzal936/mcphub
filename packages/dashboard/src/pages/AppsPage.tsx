@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Zap, Trash2, ExternalLink, Activity, Clock } from 'lucide-react'
+import { Plus, Plug, Trash2, ExternalLink, Activity, Clock } from 'lucide-react'
 import { api, apiError, type App } from '../lib/api.ts'
 import { useToast } from '../components/Toast.tsx'
 import { CopyButton } from '../components/CopyButton.tsx'
@@ -76,7 +76,7 @@ export default function AppsPage() {
         </div>
         <Link
           to="/apps/new"
-          className="flex items-center gap-2 bg-brand-600 hover:bg-brand-500 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors shadow-lg shadow-brand-900/30"
+          className="flex items-center gap-2 bg-brand-600 hover:bg-brand-500 text-onaccent px-4 py-2 rounded-xl text-sm font-medium transition-colors shadow-lg shadow-brand-900/30"
         >
           <Plus className="w-4 h-4" />
           Connect API
@@ -91,7 +91,7 @@ export default function AppsPage() {
           </p>
           <button
             onClick={claimOrphans} disabled={claiming}
-            className="bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap"
+            className="bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-onaccent px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap"
           >
             {claiming ? 'Claiming…' : `Claim ${orphans === 1 ? 'app' : 'apps'}`}
           </button>
@@ -109,7 +109,7 @@ export default function AppsPage() {
       {!loading && apps.length === 0 && (
         <div className="border border-dashed border-gray-800 rounded-2xl p-16 text-center">
           <div className="w-14 h-14 bg-brand-950 border border-brand-900 rounded-2xl flex items-center justify-center mx-auto mb-5">
-            <Zap className="w-7 h-7 text-brand-400" />
+            <Plug className="w-7 h-7 text-brand-400" />
           </div>
           <h2 className="text-xl font-semibold text-white mb-2">No APIs connected yet</h2>
           <p className="text-gray-500 text-sm mb-6 max-w-sm mx-auto">
@@ -117,7 +117,7 @@ export default function AppsPage() {
           </p>
           <Link
             to="/apps/new"
-            className="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-500 text-white px-5 py-2.5 rounded-xl text-sm font-medium transition-colors"
+            className="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-500 text-onaccent px-5 py-2.5 rounded-xl text-sm font-medium transition-colors"
           >
             <Plus className="w-4 h-4" />
             Connect your first API
@@ -134,7 +134,7 @@ export default function AppsPage() {
               className="bg-gray-900 border border-gray-800 hover:border-gray-700 rounded-xl p-5 flex items-center gap-4 transition-all group"
             >
               <div className="w-10 h-10 bg-brand-950 border border-brand-900 rounded-xl flex items-center justify-center flex-shrink-0">
-                <Zap className="w-4.5 h-4.5 text-brand-400" />
+                <Plug className="w-4.5 h-4.5 text-brand-400" />
               </div>
 
               <div className="flex-1 min-w-0">
@@ -157,7 +157,7 @@ export default function AppsPage() {
                   <CopyButton text={mcpUrlFor(app.id)} />
                 </div>
                 {ago && (
-                  <p className="text-xs text-gray-700 mt-0.5 flex items-center gap-1">
+                  <p className="text-xs text-gray-600 mt-0.5 flex items-center gap-1">
                     <Clock className="w-3 h-3" />
                     Last call {ago}
                   </p>
@@ -182,7 +182,7 @@ export default function AppsPage() {
                 </Link>
                 <button
                   onClick={() => deleteApp(app.id, app.name)}
-                  className="text-gray-700 hover:text-red-400 transition-colors p-1.5 rounded-lg hover:bg-red-950/50"
+                  className="text-gray-600 hover:text-red-400 transition-colors p-1.5 rounded-lg hover:bg-red-950/50"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>

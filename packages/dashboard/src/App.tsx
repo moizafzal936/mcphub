@@ -1,5 +1,6 @@
 import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom'
-import { Zap, LayoutDashboard, Plus, LogOut } from 'lucide-react'
+import { LayoutDashboard, Plus, LogOut } from 'lucide-react'
+import { Logo, ThemeToggle } from './components/Brand.tsx'
 import { ToastProvider } from './components/Toast.tsx'
 import { AuthProvider, RequireAuth, useAuth } from './components/Auth.tsx'
 import LandingPage from './pages/LandingPage.tsx'
@@ -20,9 +21,8 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
       <div className="min-h-screen flex flex-col">
         <header className="border-b border-gray-800/80 bg-gray-900/50 backdrop-blur sticky top-0 z-30">
           <div className="max-w-6xl mx-auto px-4 h-14 flex items-center gap-4">
-            <Link to="/" className="flex items-center gap-2 font-bold text-white">
-              <Zap className="w-4.5 h-4.5 text-brand-400" />
-              MCPHub
+            <Link to="/" aria-label="MCPHub home">
+              <Logo size="sm" />
             </Link>
             <span className="w-px h-4 bg-gray-800" />
             <Link
@@ -36,6 +36,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
             </Link>
             <div className="ml-auto flex items-center gap-3">
               <Link to="/account" className="hidden sm:inline text-xs text-gray-500 hover:text-white truncate max-w-[180px]" title="Account settings">{user?.email}</Link>
+              <ThemeToggle />
               <button
                 onClick={async () => { await logout(); navigate('/login') }}
                 className="text-gray-500 hover:text-white transition-colors p-1"
@@ -46,7 +47,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
               </button>
               <Link
                 to="/apps/new"
-                className="flex items-center gap-1.5 bg-brand-600 hover:bg-brand-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                className="flex items-center gap-1.5 bg-brand-600 hover:bg-brand-500 text-onaccent px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" />
                 New App
