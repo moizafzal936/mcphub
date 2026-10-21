@@ -5,11 +5,12 @@ import {
   Clock, CheckCircle, XCircle, Activity, Terminal, List, Radio,
   Plus, Trash2, X, Settings, Sparkles, TerminalSquare, FileUp, Pencil
 } from 'lucide-react'
-import { api, apiError, type App, type McpTool, type ToolCallLog } from '../lib/api.ts'
+import { api, apiError, argumentFields, type App, type McpTool, type Readiness, type ReadinessIssue, type ToolCallLog } from '../lib/api.ts'
 import { useToast } from '../components/Toast.tsx'
 import { ToolTester } from '../components/ToolTester.tsx'
 import { ConnectPanel } from '../components/ConnectPanel.tsx'
 import { SettingsPanel } from '../components/SettingsPanel.tsx'
+import { ReadinessCard } from '../components/ReadinessCard.tsx'
 import { PlaygroundPanel } from '../components/PlaygroundPanel.tsx'
 import { CurlImportModal } from '../components/CurlImportModal.tsx'
 import { ImportSpecModal } from '../components/ImportSpecModal.tsx'
@@ -311,13 +312,15 @@ export default function AppDetailPage() {
   const [errorsOnly, setErrorsOnly] = useState(false)
   const [showCurl, setShowCurl] = useState(false)
   const [showSpec, setShowSpec] = useState(false)
-  const [editing, setEditing] = useState<{ id: string; name: string; description: string } | null>(null)
+  const [editing, setEditing] = useState<{ id: string; name: string; description: string; params: Record<string, string> } | null>(null)
+  const [readiness, setReadiness] = useState<Readiness | null>(null)
+  const [focus, setFocus] = useState<ReadinessIssue | null>(null)
   const [stats, setStats] = useState<Record<string, { calls: number; errors: number; avgMs: number }>>({})
   const [toolFilter, setToolFilter] = useState('')
   const needle = toolFilter.trim().toLowerCase()
-  const shownTools = needle
-    ? tools.filter(t => `${t.name} ${t.method} ${t.path} ${t.description}`.toLowerCase().includes(needle))
-    : tools
+  const shownTools = tools
+    .filter(t => !focus || focus.tools.includes(t.name))
+    .filter(t => !needle || `${t.name} ${t.method} ${t.path} ${t.description}`.toLowerCase().includes(needle))
 
   async function setShownEnabled(enabled: boolean) {
     if (!app) return
@@ -331,6 +334,13 @@ export default function AppDetailPage() {
       error('Could not update tools', apiError(err))
     }
   }
+
+  // Re-score after any change to the tools or to settings that change what AI clients see.
+  useEffect(() => {
+    if (!id || tab !== 'tools' || tools.length === 0) return
+    const timer = setTimeout(() => api.tools.readiness(id).then(setReadiness).catch(() => {}), 250)
+    return () => clearTimeout(timer)
+  }, [id, tab, tools, app?.readOnly, app?.apiKeyIn, app?.apiKeyHeader])
 
   useEffect(() => {
     if (!id || tab !== 'tools') return
@@ -398,11 +408,26 @@ export default function AppDetailPage() {
     info(tool.enabled ? 'Tool disabled' : 'Tool enabled', tool.name)
   }
 
+  function startEdit(tool: McpTool) {
+    setEditing({
+      id: tool.id, name: tool.name, description: tool.description,
+      params: Object.fromEntries(argumentFields(tool).map(f => [f.name, f.description])),
+    })
+  }
+
   async function saveEdit() {
     if (!editing || !app) return
     try {
-      await api.tools.updateMeta(app.id, editing.id, { name: editing.name.trim(), description: editing.description })
-      setTools(ts => ts.map(t => (t.id === editing.id ? { ...t, name: editing.name.trim(), description: editing.description } : t)))
+      const original = tools.find(t => t.id === editing.id)
+      const before = Object.fromEntries(original ? argumentFields(original).map(f => [f.name, f.description]) : [])
+      const changed = Object.fromEntries(Object.entries(editing.params).filter(([n, d]) => d !== before[n]))
+      await api.tools.updateMeta(app.id, editing.id, {
+        name: editing.name.trim(), description: editing.description,
+        ...(Object.keys(changed).length ? { parameterDescriptions: changed } : {}),
+      })
+      // The server trims descriptions; reload this tool's stored shape instead of guessing it.
+      const fresh = (await api.tools.list(app.id)).find(t => t.id === editing.id)
+      setTools(ts => ts.map(t => (t.id === editing.id ? fresh ?? { ...t, name: editing.name.trim(), description: editing.description } : t)))
       success('Tool updated', editing.name.trim())
       setEditing(null)
     } catch (err) {
@@ -440,25 +465,27 @@ export default function AppDetailPage() {
         <button onClick={() => navigate('/dashboard')} className="text-gray-500 hover:text-white transition-colors p-1">
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <div className="w-9 h-9 bg-brand-950 border border-brand-900 rounded-xl flex items-center justify-center">
+        <div className="w-9 h-9 flex-shrink-0 bg-brand-950 border border-brand-900 rounded-xl flex items-center justify-center">
           <Zap className="w-4 h-4 text-brand-400" />
         </div>
-        <div>
-          <h1 className="text-xl font-bold text-white leading-tight flex items-center gap-2">
-            {app.name}
-            {app.readOnly && <span className="text-[10px] font-medium text-amber-300 bg-amber-950 border border-amber-900 px-1.5 py-0.5 rounded">Read-only</span>}
+        <div className="min-w-0 flex-1">
+          <h1 className="text-xl font-bold text-white leading-tight flex flex-wrap items-center gap-x-2">
+            <span className="break-words min-w-0">{app.name}</span>
+            {app.readOnly && <span className="text-[10px] font-medium text-amber-300 bg-amber-950 border border-amber-900 px-1.5 py-0.5 rounded whitespace-nowrap">Read-only</span>}
           </h1>
-          <p className="text-xs text-gray-500 font-mono">{app.baseUrl}</p>
+          <p className="text-xs text-gray-500 font-mono truncate" title={app.baseUrl}>{app.baseUrl}</p>
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex-shrink-0 flex items-center gap-2">
           {app.specUrl && (
             <button
               onClick={reimport}
               disabled={importing}
+              title="Re-import tools from the spec URL"
+              aria-label="Re-import tools from the spec URL"
               className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white border border-gray-800 hover:border-gray-700 px-3 py-1.5 rounded-lg transition-colors"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${importing ? 'animate-spin' : ''}`} />
-              Re-import
+              <span className="hidden sm:inline">Re-import</span>
             </button>
           )}
         </div>
@@ -515,6 +542,15 @@ export default function AppDetailPage() {
       {/* Tools tab */}
       {tab === 'tools' && (
         <div>
+          {tools.length > 0 && readiness && (
+            <ReadinessCard readiness={readiness} onFocus={issue => { setFocus(issue); setToolFilter('') }} />
+          )}
+          {focus && (
+            <div className="flex items-center gap-2 mb-3 text-xs bg-brand-950/40 border border-brand-900 rounded-lg px-3 py-2">
+              <span className="flex-1 min-w-0 text-brand-200 truncate">Showing tools for: {focus.title}</span>
+              <button onClick={() => setFocus(null)} className="text-brand-300 hover:text-white whitespace-nowrap">Show all</button>
+            </div>
+          )}
           <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
             <div className="flex flex-wrap items-center gap-2">
               <input
@@ -522,7 +558,7 @@ export default function AppDetailPage() {
                 className="w-40 bg-gray-950 border border-gray-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-brand-500"
               />
               <span className="text-xs text-gray-600 whitespace-nowrap">{shownTools.length}/{tools.length}</span>
-              {toolFilter && shownTools.length > 0 && (
+              {(toolFilter || focus) && shownTools.length > 0 && (
                 <>
                   <button onClick={() => setShownEnabled(true)} className="text-xs text-gray-400 hover:text-white whitespace-nowrap">Enable shown</button>
                   <button onClick={() => setShownEnabled(false)} className="text-xs text-gray-400 hover:text-white whitespace-nowrap">Disable shown</button>
@@ -591,6 +627,22 @@ export default function AppDetailPage() {
                     <textarea value={editing.description} onChange={e => setEditing({ ...editing, description: e.target.value })} rows={3} maxLength={2000}
                       aria-label="Tool description" placeholder="Explain when an AI should use this tool and what it returns"
                       className="w-full bg-gray-950 border border-gray-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-brand-500" />
+                    {Object.keys(editing.params).length > 0 && (
+                      <div className="space-y-1.5">
+                        <p className="text-[11px] text-gray-500">Parameters — describe the format and give an example</p>
+                        {argumentFields(tool).filter(f => f.name in editing.params).map(f => (
+                          <label key={f.name} className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                            <code className="sm:w-28 flex-shrink-0 truncate text-[11px] text-gray-400" title={`${f.name} (${f.in})`}>{f.name}</code>
+                            <input
+                              value={editing.params[f.name]} maxLength={1000} aria-label={`Description of ${f.name}`}
+                              placeholder={`What ${f.name} means, e.g. format or example`}
+                              onChange={e => setEditing({ ...editing, params: { ...editing.params, [f.name]: e.target.value } })}
+                              className="w-full sm:flex-1 min-w-0 bg-gray-950 border border-gray-800 rounded-lg px-2.5 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-brand-500"
+                            />
+                          </label>
+                        ))}
+                      </div>
+                    )}
                     <div className="flex gap-2">
                       <button type="submit" className="text-xs bg-brand-600 hover:bg-brand-500 text-white px-3 py-1 rounded-lg">Save</button>
                       <button type="button" onClick={() => setEditing(null)} className="text-xs text-gray-400 hover:text-white px-3 py-1">Cancel</button>
@@ -613,7 +665,7 @@ export default function AppDetailPage() {
                 )}
                 <code className="text-xs text-gray-700 font-mono hidden md:block flex-shrink-0">{tool.path}</code>
                 <button
-                  onClick={() => setEditing({ id: tool.id, name: tool.name, description: tool.description })}
+                  onClick={() => startEdit(tool)}
                   className="text-gray-600 hover:text-white transition-colors flex-shrink-0"
                   title="Edit name and description" aria-label={`Edit ${tool.name}`}
                 >

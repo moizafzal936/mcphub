@@ -6,6 +6,7 @@ import { runTool } from '../ingestion/runTool.js'
 import { toolFromCurl } from '../ingestion/curl.js'
 import { isPostmanCollection, toolsFromPostman } from '../ingestion/postman.js'
 import { appConfigSchema, exportAppConfig, toolsFromConfig } from '../ingestion/appConfig.js'
+import { assessReadiness } from '../ingestion/readiness.js'
 import {
   MAX_TOOLS_PER_APP, ToolInputError, isValidCredentialName, isValidParamName, isValidToolName, pathPlaceholders, sanitizeParameters,
   toolForApp, validateToolPath,
@@ -86,6 +87,9 @@ const updateToolSchema = z.object({
   enabled: z.boolean().optional(),
   name: z.string().trim().refine(isValidToolName, 'Invalid tool name').optional(),
   description: z.string().max(2000).optional(),
+  // Argument name -> description, for path/query/header parameters and top-level body fields.
+  parameterDescriptions: z.record(z.string(), z.string().max(1000))
+    .refine(d => Object.keys(d).length <= 200, 'Too many parameters').optional(),
 }).strict()
 
 const createTokenSchema = z.object({
@@ -377,12 +381,26 @@ router.post('/apps/:id/tools/from-curl', asyncHandler(async (req, res) => {
 
 router.patch('/apps/:id/tools/:toolId', asyncHandler(async (req, res) => {
   const app = await ownedApp(req)
-  const patch = updateToolSchema.parse(req.body)
+  const { parameterDescriptions, ...patch } = updateToolSchema.parse(req.body)
   if (patch.name) {
     const clash = await toolRepo.findByNameInApp(app.id, patch.name)
     if (clash && clash.id !== req.params.toolId) throw new HttpError(409, `A tool named "${patch.name}" already exists`)
   }
-  if (!(await toolRepo.updateInApp(app.id, req.params.toolId, patch))) throw new HttpError(404, 'Tool not found')
+  const fields: { parameters?: McpTool['parameters']; requestBodySchema?: Record<string, unknown> } = {}
+  if (parameterDescriptions) {
+    const tool = await toolRepo.findInApp(app.id, req.params.toolId)
+    if (!tool) throw new HttpError(404, 'Tool not found')
+    const bodyProps = (tool.requestBodySchema as any)?.properties ?? {}
+    const unknown = Object.keys(parameterDescriptions).filter(n => !tool.parameters.some(p => p.name === n) && !Object.hasOwn(bodyProps, n))
+    if (unknown.length) throw new HttpError(400, `Unknown parameter(s): ${unknown.join(', ')}`)
+    fields.parameters = tool.parameters.map(p => (Object.hasOwn(parameterDescriptions, p.name) ? { ...p, description: parameterDescriptions[p.name].trim() } : p))
+    if (tool.requestBodySchema) {
+      const properties = Object.fromEntries(Object.entries<any>(bodyProps).map(([n, s]) =>
+        [n, Object.hasOwn(parameterDescriptions, n) && !tool.parameters.some(p => p.name === n) ? { ...s, description: parameterDescriptions[n].trim() } : s]))
+      fields.requestBodySchema = { ...tool.requestBodySchema, properties }
+    }
+  }
+  if (!(await toolRepo.updateInApp(app.id, req.params.toolId, { ...patch, ...fields }))) throw new HttpError(404, 'Tool not found')
   res.json({ ok: true })
 }))
 
@@ -406,6 +424,11 @@ router.get('/apps/:id/logs', asyncHandler(async (req, res) => {
   const app = await ownedApp(req)
   const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 200)
   res.json(await logRepo.findByAppId(app.id, limit))
+}))
+
+router.get('/apps/:id/readiness', asyncHandler(async (req, res) => {
+  const app = await ownedApp(req)
+  res.json(assessReadiness(app, await toolRepo.findAllByAppId(app.id)))
 }))
 
 router.get('/apps/:id/tool-stats', asyncHandler(async (req, res) => {

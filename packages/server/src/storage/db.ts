@@ -440,12 +440,18 @@ export const toolRepo = {
     ], 'write')
   },
 
-  async updateInApp(appId: string, toolId: string, patch: { enabled?: boolean; name?: string; description?: string }): Promise<boolean> {
+  async updateInApp(
+    appId: string,
+    toolId: string,
+    patch: { enabled?: boolean; name?: string; description?: string; parameters?: McpTool['parameters']; requestBodySchema?: Record<string, unknown> }
+  ): Promise<boolean> {
     const sets: string[] = []
     const args: (string | number)[] = []
     if (patch.enabled !== undefined) { sets.push('enabled = ?'); args.push(patch.enabled ? 1 : 0) }
     if (patch.name !== undefined) { sets.push('name = ?'); args.push(patch.name) }
     if (patch.description !== undefined) { sets.push('description = ?'); args.push(patch.description) }
+    if (patch.parameters !== undefined) { sets.push('parameters = ?'); args.push(JSON.stringify(patch.parameters)) }
+    if (patch.requestBodySchema !== undefined) { sets.push('request_body_schema = ?'); args.push(JSON.stringify(patch.requestBodySchema)) }
     if (!sets.length) return true
     args.push(toolId, appId)
     const res = await getDb().execute({ sql: `UPDATE mcp_tools SET ${sets.join(', ')} WHERE id = ? AND app_id = ?`, args })

@@ -68,6 +68,33 @@ export interface McpTool {
   enabled: boolean
 }
 
+export interface ReadinessIssue {
+  id: string
+  severity: 'high' | 'medium' | 'low' | 'info'
+  title: string
+  detail: string
+  tools: string[]
+}
+
+export interface Readiness {
+  score: number
+  grade: 'great' | 'good' | 'needs-work'
+  exposed: number
+  issues: ReadinessIssue[]
+}
+
+/** Every argument an AI client fills in: path/query/header parameters plus top-level body fields. */
+export function argumentFields(tool: McpTool): { name: string; in: string; description: string }[] {
+  const fields = tool.parameters.map(p => ({ name: p.name, in: p.in, description: p.description ?? '' }))
+  const body = (tool.requestBodySchema as any)?.properties
+  if (body && typeof body === 'object') {
+    for (const [name, schema] of Object.entries<any>(body)) {
+      if (!fields.some(f => f.name === name)) fields.push({ name, in: 'body', description: typeof schema?.description === 'string' ? schema.description : '' })
+    }
+  }
+  return fields
+}
+
 export interface ToolCallLog {
   id: string
   toolName: string
@@ -167,10 +194,11 @@ export const api = {
       http.post<{ tool: McpTool; skippedHeaders: string[]; usedBasicAuth: boolean }>(`/apps/${appId}/tools/from-curl`, { curl, ...(name ? { name } : {}) }).then(r => r.data),
     toggle: (appId: string, toolId: string, enabled: boolean) =>
       http.patch(`/apps/${appId}/tools/${toolId}`, { enabled }).then(r => r.data),
-    updateMeta: (appId: string, toolId: string, data: { name?: string; description?: string }) =>
+    updateMeta: (appId: string, toolId: string, data: { name?: string; description?: string; parameterDescriptions?: Record<string, string> }) =>
       http.patch(`/apps/${appId}/tools/${toolId}`, data).then(r => r.data),
     delete: (appId: string, toolId: string) =>
       http.delete(`/apps/${appId}/tools/${toolId}`).then(r => r.data),
+    readiness: (appId: string) => http.get<Readiness>(`/apps/${appId}/readiness`).then(r => r.data),
     stats: (appId: string) =>
       http.get<{ toolName: string; calls: number; errors: number; avgMs: number; lastCalledAt: number }[]>(`/apps/${appId}/tool-stats`).then(r => r.data),
     execute: (appId: string, toolId: string, args: Record<string, unknown>) =>
