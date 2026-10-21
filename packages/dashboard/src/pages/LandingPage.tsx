@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Zap, ArrowRight, Terminal, Globe, Shield, Layers, CheckCircle } from 'lucide-react'
+import { Zap, ArrowRight, Terminal, Globe, Shield, Layers, Activity, KeyRound, Gauge, Scissors } from 'lucide-react'
 import { api } from '../lib/api.ts'
 import { useAuth } from '../components/Auth.tsx'
 
@@ -34,12 +34,15 @@ const STEPS = [
 ]
 
 const FEATURES = [
-  { icon: Globe, title: 'Any REST API', desc: 'OpenAPI (URL, file or paste), Postman collections, curl examples, or hand-written tools with typed parameters.' },
+  { icon: Globe, title: 'Any REST API', desc: 'OpenAPI (URL, file or paste), Postman collections, curl examples or hand-written tools. Export an app and import it on another server.' },
+  { icon: KeyRound, title: 'Any auth scheme', desc: 'API keys in a header or query string, OAuth 2.0 client credentials with automatic token refresh, and fixed headers such as API versions or a second key.' },
   { icon: Zap, title: 'One-click connect', desc: 'Standard MCP OAuth sign-in for Claude, Claude Code and Cursor, plus revocable access tokens for scripts.' },
-  { icon: Shield, title: 'Secure by default', desc: 'Encrypted credentials, SSRF protection, per-request auth, rate limits and optional two-factor sign-in.' },
+  { icon: Gauge, title: 'AI-readiness score', desc: 'Flags vague or generated descriptions, look-alike tools, undocumented parameters and oversized tool lists, and lets you fix each one in place.' },
+  { icon: Scissors, title: 'Responses sized for AI', desc: 'Pick the fields the model actually needs from a real response. A book search went from 9,901 to 709 characters, 93% fewer tokens.' },
+  { icon: Shield, title: 'Secure by default', desc: 'Encrypted secrets that AI clients never see, SSRF protection, rate limits, redacted logs and optional two-factor sign-in.' },
   { icon: Layers, title: 'You stay in control', desc: 'Enable or disable tools, switch an app to read-only for AI clients, and disconnect any client instantly.' },
-  { icon: Terminal, title: 'Test and playground', desc: 'Run any tool from the dashboard, or chat with Claude while it calls your tools live.' },
-  { icon: CheckCircle, title: 'Live logs', desc: 'Watch every tool call as it happens, with sensitive values redacted and bounded retention.' },
+  { icon: Terminal, title: 'Test and playground', desc: 'Run any tool and see exactly what the AI receives, or chat with Claude while it calls your tools live.' },
+  { icon: Activity, title: 'Live logs and stats', desc: 'Watch every tool call as it happens, with per-tool call counts, errors and latency.' },
 ]
 
 export default function LandingPage() {
@@ -81,7 +84,7 @@ export default function LandingPage() {
     <div className="min-h-screen bg-gray-950 text-white">
       {/* Nav */}
       <nav className="border-b border-gray-900 sticky top-0 z-40 bg-gray-950/80 backdrop-blur">
-        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center gap-6">
+        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center gap-3 sm:gap-6">
           <Link to="/" className="flex items-center gap-2 font-bold text-lg">
             <Zap className="w-5 h-5 text-brand-400" />
             MCPHub
@@ -95,7 +98,7 @@ export default function LandingPage() {
             </Link>
             <Link
               to="/apps/new"
-              className="flex items-center gap-1.5 bg-brand-600 hover:bg-brand-500 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-colors"
+              className="flex items-center gap-1.5 bg-brand-600 hover:bg-brand-500 text-white px-3 sm:px-4 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors"
             >
               Get started <ArrowRight className="w-3.5 h-3.5" />
             </Link>
@@ -235,14 +238,14 @@ export default function LandingPage() {
         <div className="bg-gradient-to-br from-brand-950 to-purple-950/50 border border-brand-800/50 rounded-3xl p-12">
           <h2 className="text-3xl font-bold mb-4">Ready to make your API AI-native?</h2>
           <p className="text-gray-400 mb-8">
-            Join developers who are building the future of AI-powered apps with MCPHub.
+            Bring a spec, a Postman collection or a single curl command. Your keys stay encrypted on your MCPHub server; the AI only ever sees the tools.
           </p>
           <Link
             to="/apps/new"
             className="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-500 text-white px-8 py-3.5 rounded-xl font-semibold text-base transition-all hover:scale-105 shadow-lg shadow-brand-900/50"
           >
             <Zap className="w-5 h-5" />
-            Start for free — no signup needed
+            Connect your first API
           </Link>
         </div>
       </section>
