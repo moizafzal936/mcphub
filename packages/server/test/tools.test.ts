@@ -122,3 +122,48 @@ test('OpenAPI specs can be imported from pasted text (for specs on private hosts
   const empty = await user.req('POST', `/api/apps/${app.id}/import-spec`, 'openapi: 3.0.0\npaths: {}', { 'content-type': 'text/plain' })
   assert.equal(empty.status, 422)
 })
+
+test('Postman collections are detected and imported through the same endpoint', async () => {
+  const app = await createApp(user, fx)
+  const collection = {
+    info: { _postman_id: 'abc', name: 'Fixture', schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json' },
+    item: [
+      {
+        name: 'Items',
+        item: [
+          {
+            name: 'Get item',
+            request: {
+              method: 'GET',
+              url: { raw: '{{baseUrl}}/v1/items/:id?verbose=1&skip=0', host: ['{{baseUrl}}'], path: ['v1', 'items', ':id'],
+                query: [{ key: 'verbose', value: '1' }, { key: 'skip', value: '0', disabled: true }] },
+            },
+          },
+        ],
+      },
+      {
+        name: 'Create echo',
+        request: {
+          method: 'POST',
+          header: [{ key: 'Authorization', value: 'Bearer {{token}}' }, { key: 'X-Team', value: 'core' }],
+          url: '{{baseUrl}}/v1/echo',
+          body: { mode: 'raw', raw: '{"title": "hi", "count": {{count}}, "owner": "{{owner}}"}' },
+        },
+      },
+      { name: 'Upload file', request: { method: 'POST', url: '{{baseUrl}}/v1/upload', body: { mode: 'formdata', formdata: [] } } },
+    ],
+  }
+  const res = await user.req('POST', `/api/apps/${app.id}/import-spec`, JSON.stringify(collection), { 'content-type': 'text/plain' })
+  assert.equal(res.status, 200, JSON.stringify(res.body).slice(0, 300))
+  assert.equal(res.body.format, 'postman')
+  assert.deepEqual(res.body.skipped, ['Upload file (formdata body)'])
+  const byName = Object.fromEntries(res.body.tools.map((t: any) => [t.name, t]))
+  assert.equal(byName.get_item.path, '/items/{id}')
+  assert.deepEqual(byName.get_item.parameters.map((p: any) => [p.name, p.in, p.schema.type]), [['id', 'path', 'string'], ['verbose', 'query', 'integer']])
+  assert.deepEqual(byName.create_echo.parameters.map((p: any) => p.name), ['X-Team'])
+  assert.deepEqual(Object.keys(byName.create_echo.requestBodySchema.properties), ['title', 'count', 'owner'])
+
+  const run = await user.post(`/api/apps/${app.id}/tools/${byName.get_item.id}/execute`, { id: 'pm-1', verbose: 2 })
+  assert.equal(run.body.data.id, 'pm-1')
+  assert.equal(fx.upstreamHits.at(-1)!.url, '/v1/items/pm-1?verbose=2')
+})

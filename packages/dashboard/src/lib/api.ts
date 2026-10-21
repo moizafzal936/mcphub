@@ -143,9 +143,9 @@ export const api = {
       http.patch<App>(`/apps/${id}`, patch).then(r => r.data),
     delete: (id: string) => http.delete(`/apps/${id}`).then(r => r.data),
     import: (id: string, specUrl?: string) =>
-      http.post<{ imported: number; tools: McpTool[] }>(`/apps/${id}/import`, specUrl ? { specUrl } : {}).then(r => r.data),
+      http.post<{ imported: number; tools: McpTool[]; format?: 'openapi' | 'postman'; skipped?: string[] }>(`/apps/${id}/import`, specUrl ? { specUrl } : {}).then(r => r.data),
     importSpecText: (id: string, spec: string) =>
-      http.post<{ imported: number; tools: McpTool[] }>(`/apps/${id}/import-spec`, spec, { headers: { 'Content-Type': 'text/plain' }, timeout: 60_000 }).then(r => r.data),
+      http.post<{ imported: number; tools: McpTool[]; format?: 'openapi' | 'postman'; skipped?: string[] }>(`/apps/${id}/import-spec`, spec, { headers: { 'Content-Type': 'text/plain' }, timeout: 60_000 }).then(r => r.data),
   },
   tools: {
     list: (appId: string) => http.get<McpTool[]>(`/apps/${appId}/tools`).then(r => r.data),

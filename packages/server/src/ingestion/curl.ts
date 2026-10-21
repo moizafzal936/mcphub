@@ -102,7 +102,7 @@ export function parseCurl(command: string): ParsedCurl {
   return { method: method ?? (forceGet ? 'GET' : body !== undefined ? 'POST' : 'GET'), url, headers, body, basicAuth }
 }
 
-function jsonType(value: unknown): string {
+export function jsonType(value: unknown): string {
   if (typeof value === 'boolean') return 'boolean'
   if (typeof value === 'number') return Number.isInteger(value) ? 'integer' : 'number'
   if (Array.isArray(value)) return 'array'
@@ -156,34 +156,8 @@ export function toolFromCurl(command: string, app: { id: string; baseUrl: string
     params.push({ name: unique(key), in: 'query', description: `e.g. ${value}`.slice(0, 200), required: false, schema: { type: /^-?\d+$/.test(value) ? 'integer' : 'string' } })
   }
 
-  const skippedHeaders: string[] = []
-  for (const [name] of curl.headers) {
-    const lower = name.toLowerCase()
-    if (lower === 'content-type' || lower === 'accept' || lower === 'user-agent') continue
-    if (!isValidHeaderName(name) || isReservedHeader(name, app.apiKeyHeader) || /key|token|secret|auth/i.test(name)) {
-      skippedHeaders.push(name)
-      continue
-    }
-    if (!used.has(name)) params.push({ name: unique(name), in: 'header', description: `${name} header`, required: false, schema: { type: 'string' } })
-  }
-
-  let requestBodySchema: Record<string, unknown> | undefined
-  if (curl.body !== undefined && curl.method !== 'GET') {
-    let parsed: unknown
-    try {
-      parsed = JSON.parse(curl.body)
-    } catch {
-      throw new ToolInputError('Only JSON request bodies are supported')
-    }
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      const properties: Record<string, unknown> = {}
-      for (const [k, v] of Object.entries(parsed as Record<string, unknown>).slice(0, 100)) {
-        if (used.has(k)) continue
-        properties[k] = { type: jsonType(v), description: `e.g. ${JSON.stringify(v)}`.slice(0, 200) }
-      }
-      requestBodySchema = { type: 'object', properties, required: Object.keys(properties) }
-    }
-  }
+  const skippedHeaders = addHeaderParams(curl.headers, app.apiKeyHeader, params, used)
+  const requestBodySchema = curl.body !== undefined && curl.method !== 'GET' ? bodySchemaFromJson(curl.body, used) : undefined
 
   const name = overrides.name ?? sanitizeToolName(`${curl.method.toLowerCase()}_${segments.filter(s => s && !ID_SEGMENT.test(s)).join('_')}`).toLowerCase()
   const tool: Omit<McpTool, 'id'> = {
@@ -197,4 +171,39 @@ export function toolFromCurl(command: string, app: { id: string; baseUrl: string
     enabled: true,
   }
   return { tool, skippedHeaders, usedBasicAuth: curl.basicAuth }
+}
+
+/** Adds non-credential headers as header params; returns the names that were skipped. */
+export function addHeaderParams(headers: [string, string][], credentialHeader: string, params: ToolParameter[], used: Set<string>): string[] {
+  const skipped: string[] = []
+  for (const [name] of headers) {
+    const lower = name.toLowerCase()
+    if (lower === 'content-type' || lower === 'accept' || lower === 'user-agent') continue
+    if (!isValidHeaderName(name) || isReservedHeader(name, credentialHeader) || /key|token|secret|auth/i.test(name)) {
+      skipped.push(name)
+      continue
+    }
+    if (!used.has(name)) {
+      used.add(name)
+      params.push({ name, in: 'header', description: `${name} header`, required: false, schema: { type: 'string' } })
+    }
+  }
+  return skipped
+}
+
+/** Derives a typed body schema from an example JSON object body. */
+export function bodySchemaFromJson(raw: string, used: Set<string>): Record<string, unknown> | undefined {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    throw new ToolInputError('Only JSON request bodies are supported')
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return undefined
+  const properties: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(parsed as Record<string, unknown>).slice(0, 100)) {
+    if (used.has(k)) continue
+    properties[k] = { type: jsonType(v), description: `e.g. ${JSON.stringify(v)}`.slice(0, 200) }
+  }
+  return { type: 'object', properties, required: Object.keys(properties) }
 }

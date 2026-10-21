@@ -4,6 +4,7 @@ import { appRepo, logRepo, newId, tokenRepo, toolRepo, userRepo } from '../stora
 import { parseOpenApiSpec, parseSpecDocument, parseSpecText } from '../ingestion/openapi.js'
 import { runTool } from '../ingestion/runTool.js'
 import { toolFromCurl } from '../ingestion/curl.js'
+import { isPostmanCollection, toolsFromPostman } from '../ingestion/postman.js'
 import {
   MAX_TOOLS_PER_APP, ToolInputError, isValidParamName, isValidToolName, pathPlaceholders, sanitizeParameters, validateToolPath,
 } from '../ingestion/toolSchema.js'
@@ -201,14 +202,22 @@ router.post('/apps/:id/import-spec', express.text({ type: () => true, limit: '10
   const app = await ownedApp(req)
   if (typeof req.body !== 'string' || !req.body.trim()) throw new HttpError(400, 'Send the spec as the request body (JSON or YAML)')
   let tools: McpTool[]
+  let skipped: string[] = []
+  let format = 'openapi'
   try {
-    tools = parseSpecDocument(parseSpecText(req.body), app.id, app.apiKeyHeader)
+    const doc = parseSpecText(req.body)
+    if (isPostmanCollection(doc)) {
+      format = 'postman'
+      ;({ tools, skipped } = toolsFromPostman(doc, app))
+    } else {
+      tools = parseSpecDocument(doc, app.id, app.apiKeyHeader)
+    }
   } catch (err: any) {
-    throw new HttpError(422, `Spec import failed: ${err?.message ?? 'unknown error'}`)
+    throw new HttpError(422, `Import failed: ${err?.message ?? 'unknown error'}`)
   }
-  if (!tools.length) throw new HttpError(422, 'No operations found in this spec')
+  if (!tools.length) throw new HttpError(422, 'No usable requests found in this file')
   await toolRepo.replaceAllForApp(app.id, tools)
-  res.json({ imported: tools.length, tools })
+  res.json({ imported: tools.length, tools, format, skipped })
 }))
 
 // ── Tools ──────────────────────────────────────────────────────────────────────
