@@ -102,6 +102,13 @@ export interface ConsentRequest {
   scopes: string[]
 }
 
+export interface PlaygroundStep {
+  tool: string
+  input: unknown
+  statusCode: number
+  durationMs: number
+}
+
 export interface ExecResult {
   data: unknown
   statusCode: number
@@ -161,6 +168,11 @@ export const api = {
     create: (appId: string, name: string) =>
       http.post<McpToken & { token: string }>(`/apps/${appId}/tokens`, { name }).then(r => r.data),
     revoke: (appId: string, tokenId: string) => http.delete(`/apps/${appId}/tokens/${tokenId}`).then(r => r.data),
+  },
+  playground: {
+    status: () => http.get<{ enabled: boolean }>('/playground/status').then(r => r.data),
+    run: (appId: string, messages: { role: 'user' | 'assistant'; content: string }[]) =>
+      http.post<{ reply: string; steps: PlaygroundStep[] }>(`/apps/${appId}/playground`, { messages }, { timeout: 120_000 }).then(r => r.data),
   },
   orphans: {
     status: () => http.get<{ count: number; canClaim: boolean }>('/orphans').then(r => r.data),

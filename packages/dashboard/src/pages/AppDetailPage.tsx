@@ -3,15 +3,16 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, RefreshCw, Zap, ToggleLeft, ToggleRight,
   Clock, CheckCircle, XCircle, Activity, Terminal, List, Radio,
-  Plus, Trash2, X, Settings
+  Plus, Trash2, X, Settings, Sparkles
 } from 'lucide-react'
 import { api, apiError, type App, type McpTool, type ToolCallLog } from '../lib/api.ts'
 import { useToast } from '../components/Toast.tsx'
 import { ToolTester } from '../components/ToolTester.tsx'
 import { ConnectPanel } from '../components/ConnectPanel.tsx'
 import { SettingsPanel } from '../components/SettingsPanel.tsx'
+import { PlaygroundPanel } from '../components/PlaygroundPanel.tsx'
 
-type Tab = 'connect' | 'tools' | 'test' | 'logs' | 'settings'
+type Tab = 'connect' | 'tools' | 'test' | 'playground' | 'logs' | 'settings'
 
 const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']
 
@@ -428,6 +429,7 @@ export default function AppDetailPage() {
           { key: 'connect', label: 'Connect', icon: Zap },
           { key: 'tools', label: `Tools (${tools.length})`, icon: List },
           { key: 'test', label: 'Test', icon: Terminal },
+          { key: 'playground', label: 'Playground', icon: Sparkles },
           { key: 'logs', label: 'Live Logs', icon: Radio },
           { key: 'settings', label: 'Settings', icon: Settings },
         ] as { key: Tab; label: string; icon: any }[]).map(t => (
@@ -458,6 +460,7 @@ export default function AppDetailPage() {
       )}
 
       {tab === 'settings' && <SettingsPanel app={app} onUpdated={setApp} />}
+      {tab === 'playground' && <PlaygroundPanel app={app} />}
 
       {/* Tools tab */}
       {tab === 'tools' && (

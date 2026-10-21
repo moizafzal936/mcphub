@@ -15,6 +15,7 @@
     "reset-password": "tsx src/cli/reset-password.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.137.0",
     "@libsql/client": "^0.14.0",
     "@modelcontextprotocol/sdk": "^1.32.1",
     "@types/js-yaml": "^4.0.9",

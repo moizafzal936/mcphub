@@ -12,6 +12,7 @@ import { asyncHandler, HttpError } from '../http/errors.js'
 import { issueMcpToken, requireUser } from '../auth/auth.js'
 import { closeSessions } from '../mcp-host/server.js'
 import { listGrants, revokeGrantInApp } from '../auth/oauth.js'
+import { playgroundEnabled, runPlayground } from '../playground.js'
 import { getConfig } from '../config.js'
 import type { App, McpTool } from '../types/index.js'
 
@@ -305,6 +306,27 @@ router.delete('/apps/:id/tokens/:tokenId', asyncHandler(async (req, res) => {
   if (!(await tokenRepo.revokeInApp(app.id, req.params.tokenId))) throw new HttpError(404, 'Token not found')
   const closed = await closeSessions(s => s.tokenId === req.params.tokenId)
   res.json({ ok: true, closedSessions: closed })
+}))
+
+// ── Playground (Claude tool-use loop over this app's tools) ─────────────────────
+
+router.get('/playground/status', (_req, res) => {
+  res.json({ enabled: playgroundEnabled() })
+})
+
+router.post('/apps/:id/playground', asyncHandler(async (req, res) => {
+  const app = await ownedApp(req)
+  const { messages } = z.object({
+    messages: z.array(z.object({ role: z.enum(['user', 'assistant']), content: z.string().min(1).max(4000) })).min(1).max(20),
+  }).parse(req.body)
+  if (messages[messages.length - 1].role !== 'user') throw new HttpError(400, 'The last message must be from the user')
+  try {
+    res.json(await runPlayground(app, req.user!.id, messages))
+  } catch (err: any) {
+    if (err instanceof HttpError) throw err
+    // Upstream model errors (bad key, overloaded) are reported without leaking request details.
+    throw new HttpError(502, `Claude API error: ${err?.status ?? ''} ${err?.error?.error?.type ?? err?.name ?? 'request failed'}`.trim())
+  }
 }))
 
 // ── OAuth grants (clients connected via the OAuth flow) ─────────────────────────
