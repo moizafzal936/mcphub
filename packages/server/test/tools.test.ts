@@ -97,3 +97,28 @@ test('curl commands for other hosts or outside the base path are rejected', asyn
     assert.equal(res.status, 400, `${curl} -> ${res.status}`)
   }
 })
+
+test('OpenAPI specs can be imported from pasted text (for specs on private hosts)', async () => {
+  const app = await createApp(user, fx)
+  const yaml = [
+    'openapi: 3.0.0',
+    'info: { title: Internal, version: "1" }',
+    'paths:',
+    '  /items/{id}:',
+    '    get:',
+    '      operationId: getItem',
+    '      description: "' + 'x'.repeat(20_000) + '"',
+    '      parameters:',
+    '        - { name: id, in: path, required: true, schema: { type: string } }',
+  ].join('\n')
+  const res = await user.req('POST', `/api/apps/${app.id}/import-spec`, yaml, { 'content-type': 'text/plain' })
+  assert.equal(res.status, 200, JSON.stringify(res.body).slice(0, 200))
+  assert.equal(res.body.imported, 1)
+  const run = await user.post(`/api/apps/${app.id}/tools/${res.body.tools[0].id}/execute`, { id: 'from-text' })
+  assert.equal(run.body.data.id, 'from-text')
+
+  const bad = await user.req('POST', `/api/apps/${app.id}/import-spec`, 'not: [valid', { 'content-type': 'text/plain' })
+  assert.equal(bad.status, 422)
+  const empty = await user.req('POST', `/api/apps/${app.id}/import-spec`, 'openapi: 3.0.0\npaths: {}', { 'content-type': 'text/plain' })
+  assert.equal(empty.status, 422)
+})

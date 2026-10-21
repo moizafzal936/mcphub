@@ -68,6 +68,20 @@ export function parseSpecDocument(raw: unknown, appId: string, credentialHeader 
   return tools
 }
 
+/** Parses spec text (JSON or YAML) pasted or uploaded by the user. */
+export function parseSpecText(text: string): unknown {
+  if (Buffer.byteLength(text, 'utf8') > MAX_SPEC_BYTES) throw new SpecError('Spec is larger than 10 MB')
+  try {
+    return JSON.parse(text)
+  } catch {
+    try {
+      return yaml.load(text, { json: true })
+    } catch {
+      throw new SpecError('Spec is neither valid JSON nor YAML')
+    }
+  }
+}
+
 async function fetchSpec(url: string): Promise<unknown> {
   const res = await safeRequest({
     method: 'GET',

@@ -1,7 +1,7 @@
-import { Router, type Request } from 'express'
+import express, { Router, type Request } from 'express'
 import { z } from 'zod'
 import { appRepo, logRepo, newId, tokenRepo, toolRepo, userRepo } from '../storage/db.js'
-import { parseOpenApiSpec } from '../ingestion/openapi.js'
+import { parseOpenApiSpec, parseSpecDocument, parseSpecText } from '../ingestion/openapi.js'
 import { runTool } from '../ingestion/runTool.js'
 import { toolFromCurl } from '../ingestion/curl.js'
 import {
@@ -192,6 +192,21 @@ router.post('/apps/:id/import', asyncHandler(async (req, res) => {
   const target = specUrl || app.specUrl
   if (!target) throw new HttpError(400, 'No spec URL provided')
   const tools = await importSpec(target, app)
+  await toolRepo.replaceAllForApp(app.id, tools)
+  res.json({ imported: tools.length, tools })
+}))
+
+// Spec pasted or uploaded as text (for specs on private hosts, which URL import must refuse).
+router.post('/apps/:id/import-spec', express.text({ type: () => true, limit: '10mb' }), asyncHandler(async (req, res) => {
+  const app = await ownedApp(req)
+  if (typeof req.body !== 'string' || !req.body.trim()) throw new HttpError(400, 'Send the spec as the request body (JSON or YAML)')
+  let tools: McpTool[]
+  try {
+    tools = parseSpecDocument(parseSpecText(req.body), app.id, app.apiKeyHeader)
+  } catch (err: any) {
+    throw new HttpError(422, `Spec import failed: ${err?.message ?? 'unknown error'}`)
+  }
+  if (!tools.length) throw new HttpError(422, 'No operations found in this spec')
   await toolRepo.replaceAllForApp(app.id, tools)
   res.json({ imported: tools.length, tools })
 }))
