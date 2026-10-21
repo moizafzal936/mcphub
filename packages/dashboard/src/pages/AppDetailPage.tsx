@@ -471,8 +471,8 @@ export default function AppDetailPage() {
         <Stat label="Calls Today" value={todayLogs.length} icon={<Activity className="w-4 h-4 text-purple-400" />} />
       </div>
 
-      {/* Tabs */}
-      <div className="flex border-b border-gray-800 mb-5 gap-0">
+      {/* Tabs: scroll sideways on narrow screens instead of widening the page */}
+      <div className="flex border-b border-gray-800 mb-5 gap-0 overflow-x-auto [scrollbar-width:none]">
         {([
           { key: 'connect', label: 'Connect', icon: Zap },
           { key: 'tools', label: `Tools (${tools.length})`, icon: List },
@@ -484,7 +484,7 @@ export default function AppDetailPage() {
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-all border-b-2 -mb-px ${
+            className={`flex flex-shrink-0 items-center gap-1.5 px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-all border-b-2 ${
               tab === t.key
                 ? 'border-brand-400 text-white'
                 : 'border-transparent text-gray-500 hover:text-gray-300'
@@ -644,7 +644,7 @@ export default function AppDetailPage() {
 
       {/* Test tab */}
       {tab === 'test' && (
-        <div style={{ height: 'calc(100vh - 320px)', minHeight: '380px' }}>
+        <div className="min-h-[380px] md:h-[calc(100vh-320px)]">
           {tools.filter(t => t.enabled).length === 0 ? (
             <div className="text-center py-16 text-gray-600">
               No enabled tools to test. Enable some tools first.

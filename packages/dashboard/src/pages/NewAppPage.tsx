@@ -111,6 +111,7 @@ export default function NewAppPage() {
     specUrl: '',
     apiKey: '',
     apiKeyHeader: 'Authorization',
+    apiKeyIn: 'header' as 'header' | 'query',
   })
 
   const fileRef = useRef<HTMLInputElement>(null)
@@ -124,7 +125,7 @@ export default function NewAppPage() {
       const app = await api.apps.importConfig(await file.text())
       const skipped = app.skipped.length ? ` · ${app.skipped.length} unsafe parameter${app.skipped.length === 1 ? '' : 's'} skipped` : ''
       const count = app.toolCount ?? 0
-      success(`${count} tool${count === 1 ? '' : 's'} imported`,`${app.name} is live. Add its API key in Settings if it needs one${skipped}`)
+      success(`${count} tool${count === 1 ? '' : 's'} imported`, `${app.name} is live. Add its API key in Settings if it needs one${skipped}`)
       navigate(`/apps/${app.id}`)
     } catch (err) {
       error('Could not import this file', apiError(err).replace(/^Import failed: /, ''))
@@ -159,7 +160,8 @@ export default function NewAppPage() {
         baseUrl: form.baseUrl,
         specUrl: form.specUrl || undefined,
         apiKey: form.apiKey || undefined,
-        apiKeyHeader: form.apiKeyHeader || 'Authorization',
+        apiKeyHeader: form.apiKeyHeader || (form.apiKeyIn === 'query' ? 'api_key' : 'Authorization'),
+        apiKeyIn: form.apiKeyIn,
       })
       let toolCount = app.toolCount ?? 0
       const preset = selectedPreset !== null ? PRESETS[selectedPreset] : undefined
@@ -284,25 +286,48 @@ export default function NewAppPage() {
           {showAdvanced && (
             <div className="border-t border-gray-800 pt-4 space-y-4">
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Auth Header">
+                <Field label="Send key in">
+                  <select
+                    value={form.apiKeyIn}
+                    onChange={e => {
+                      const where = e.target.value as 'header' | 'query'
+                      // Swap the default name too, unless the user typed their own.
+                      setForm(f => ({
+                        ...f,
+                        apiKeyIn: where,
+                        apiKeyHeader: ['Authorization', 'api_key', ''].includes(f.apiKeyHeader) ? (where === 'query' ? 'api_key' : 'Authorization') : f.apiKeyHeader,
+                      }))
+                    }}
+                    className="input"
+                  >
+                    <option value="header">Header</option>
+                    <option value="query">Query parameter</option>
+                  </select>
+                </Field>
+                <Field label={form.apiKeyIn === 'query' ? 'Parameter name' : 'Header name'}>
                   <input
                     type="text"
-                    placeholder="Authorization"
+                    placeholder={form.apiKeyIn === 'query' ? 'api_key' : 'Authorization'}
                     value={form.apiKeyHeader}
                     onChange={e => set('apiKeyHeader', e.target.value)}
-                    className="input"
-                  />
-                </Field>
-                <Field label="API Key / Token" hint="Stored encrypted">
-                  <input
-                    type="password"
-                    placeholder="sk-... or Bearer token"
-                    value={form.apiKey}
-                    onChange={e => set('apiKey', e.target.value)}
-                    className="input"
+                    className="input font-mono"
                   />
                 </Field>
               </div>
+              <Field
+                label="API Key / Token"
+                hint={form.apiKeyIn === 'query'
+                  ? `Stored encrypted. Sent as ?${form.apiKeyHeader || 'api_key'}=… on every call; AI clients never see it.`
+                  : 'Stored encrypted. "Authorization" sends Bearer <key>; other headers send it as-is.'}
+              >
+                <input
+                  type="password"
+                  placeholder="sk-... or Bearer token"
+                  value={form.apiKey}
+                  onChange={e => set('apiKey', e.target.value)}
+                  className="input"
+                />
+              </Field>
             </div>
           )}
 

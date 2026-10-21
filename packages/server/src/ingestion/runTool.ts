@@ -3,6 +3,7 @@ import { appRepo, logRepo, newId } from '../storage/db.js'
 import { consumeToolCall, RateLimitedError } from '../security/rateLimit.js'
 import { redactForLog } from '../security/redact.js'
 import { executeTool, type ExecResult } from './executor.js'
+import { secretForms } from './toolSchema.js'
 
 /** Single entry point for tool execution (dashboard and MCP): rate limit, execute, log redacted. */
 export async function runTool(app: App, tool: McpTool, args: unknown, clientKey: string): Promise<ExecResult> {
@@ -26,7 +27,7 @@ export async function runTool(app: App, tool: McpTool, args: unknown, clientKey:
   }
 
   const result = await executeTool(app, apiKey, tool, args)
-  const secrets = apiKey ? [apiKey] : []
+  const secrets = secretForms(apiKey)
   await logRepo.insert({
     id: newId(),
     appId: app.id,

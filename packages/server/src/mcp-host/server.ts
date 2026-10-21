@@ -5,7 +5,7 @@ import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprot
 import type { Request, Response } from 'express'
 import { getConfig } from '../config.js'
 import { appRepo, toolRepo } from '../storage/db.js'
-import { buildJsonSchema } from '../ingestion/toolSchema.js'
+import { buildJsonSchema, toolForApp } from '../ingestion/toolSchema.js'
 import { runTool } from '../ingestion/runTool.js'
 import { HttpError } from '../http/errors.js'
 import type { McpAuthExtra } from '../auth/auth.js'
@@ -107,7 +107,7 @@ function buildMcpServer(appId: string, appName: string, userId: string): Server 
       tools: tools.map(tool => ({
         name: tool.name,
         description: tool.description,
-        inputSchema: buildJsonSchema(tool),
+        inputSchema: buildJsonSchema(toolForApp(app, tool)),
         annotations: {
           title: `${tool.method} ${tool.path}`,
           readOnlyHint: tool.method === 'GET',

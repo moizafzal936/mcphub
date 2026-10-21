@@ -4,7 +4,9 @@ export interface App {
   name: string
   baseUrl: string
   specUrl?: string
+  /** Name of the header or query parameter that carries the upstream credential. */
   apiKeyHeader: string
+  apiKeyIn: 'header' | 'query'
   hasApiKey: boolean
   rateLimitPerMin: number | null
   readOnly: boolean

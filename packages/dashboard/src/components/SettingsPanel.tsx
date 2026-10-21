@@ -11,6 +11,7 @@ export function SettingsPanel({ app, onUpdated }: { app: App; onUpdated: (app: A
   const navigate = useNavigate()
   const [name, setName] = useState(app.name)
   const [header, setHeader] = useState(app.apiKeyHeader)
+  const [keyIn, setKeyIn] = useState<'header' | 'query'>(app.apiKeyIn ?? 'header')
   const [rate, setRate] = useState(app.rateLimitPerMin?.toString() ?? '')
   const [newKey, setNewKey] = useState('')
   const [busy, setBusy] = useState<'save' | 'key' | 'clear' | 'delete' | 'export' | 'duplicate' | null>(null)
@@ -36,7 +37,7 @@ export function SettingsPanel({ app, onUpdated }: { app: App; onUpdated: (app: A
       error('Invalid rate limit', 'Use a whole number of calls per minute, or leave it blank for the server default')
       return
     }
-    save({ name: name.trim(), apiKeyHeader: header.trim(), rateLimitPerMin: rateValue }, 'save', 'Settings saved')
+    save({ name: name.trim(), apiKeyIn: keyIn, apiKeyHeader: header.trim(), rateLimitPerMin: rateValue }, 'save', 'Settings saved')
   }
 
   async function exportConfig() {
@@ -94,11 +95,32 @@ export function SettingsPanel({ app, onUpdated }: { app: App; onUpdated: (app: A
           <span className="text-xs font-medium text-gray-400">App name</span>
           <input value={name} onChange={e => setName(e.target.value)} maxLength={100} required className={`mt-1 ${inputCls}`} />
         </label>
-        <label className="block">
-          <span className="text-xs font-medium text-gray-400">Credential header</span>
-          <input value={header} onChange={e => setHeader(e.target.value)} maxLength={256} required className={`mt-1 ${inputCls} font-mono`} />
-          <span className="text-[11px] text-gray-600">"Authorization" sends <code>Bearer &lt;key&gt;</code>; any other header (e.g. X-API-Key) sends the key as-is.</span>
-        </label>
+        <div className="grid grid-cols-1 sm:grid-cols-[10rem_1fr] gap-3">
+          <label className="block">
+            <span className="text-xs font-medium text-gray-400">Send API key in</span>
+            <select
+              value={keyIn}
+              onChange={e => {
+                const where = e.target.value as 'header' | 'query'
+                setKeyIn(where)
+                if (['Authorization', 'api_key', ''].includes(header)) setHeader(where === 'query' ? 'api_key' : 'Authorization')
+              }}
+              className={`mt-1 ${inputCls}`}
+            >
+              <option value="header">Header</option>
+              <option value="query">Query parameter</option>
+            </select>
+          </label>
+          <label className="block">
+            <span className="text-xs font-medium text-gray-400">{keyIn === 'query' ? 'Parameter name' : 'Header name'}</span>
+            <input value={header} onChange={e => setHeader(e.target.value)} maxLength={256} required className={`mt-1 ${inputCls} font-mono`} />
+          </label>
+        </div>
+        <p className="text-[11px] text-gray-600 -mt-2">
+          {keyIn === 'query'
+            ? <>Every call adds <code>?{header || 'api_key'}=&lt;key&gt;</code>. A parameter with that name is hidden from AI clients, and the key is redacted from previews and logs.</>
+            : <>"Authorization" sends <code>Bearer &lt;key&gt;</code>; any other header (e.g. X-API-Key) sends the key as-is.</>}
+        </p>
         <label className="block">
           <span className="text-xs font-medium text-gray-400">Rate limit (tool calls per minute)</span>
           <input value={rate} onChange={e => setRate(e.target.value)} inputMode="numeric" placeholder="Server default" className={`mt-1 ${inputCls}`} />

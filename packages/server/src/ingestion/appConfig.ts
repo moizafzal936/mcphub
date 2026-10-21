@@ -21,6 +21,7 @@ export interface AppConfig {
     baseUrl: string
     specUrl?: string
     apiKeyHeader: string
+    apiKeyIn: App['apiKeyIn']
     rateLimitPerMin: number | null
     readOnly: boolean
   }
@@ -37,6 +38,7 @@ export function exportAppConfig(app: App, tools: McpTool[]): AppConfig {
       baseUrl: app.baseUrl,
       ...(app.specUrl ? { specUrl: app.specUrl } : {}),
       apiKeyHeader: app.apiKeyHeader,
+      apiKeyIn: app.apiKeyIn,
       rateLimitPerMin: app.rateLimitPerMin,
       readOnly: app.readOnly,
     },
@@ -61,7 +63,8 @@ export const appConfigSchema = z.object({
     name: z.string(),
     baseUrl: z.string(),
     specUrl: z.string().optional(),
-    apiKeyHeader: z.string().optional(),
+    apiKeyHeader: z.string().trim().min(1).max(256).optional(),
+    apiKeyIn: z.enum(['header', 'query']).optional(),
     rateLimitPerMin: z.number().nullable().optional(),
     readOnly: z.boolean().optional(),
   }),

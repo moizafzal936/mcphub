@@ -2,7 +2,7 @@ import type { App, McpTool } from '../types/index.js'
 import { safeRequest, SsrfBlockedError } from '../security/ssrf.js'
 import { isReservedHeader, isValidHeaderValue } from '../security/headers.js'
 import { redactString } from '../security/redact.js'
-import { ToolInputError, buildUpstreamUrl, validateToolArgs } from './toolSchema.js'
+import { ToolInputError, buildUpstreamUrl, secretForms, toolForApp, validateToolArgs } from './toolSchema.js'
 
 // What AI clients receive. Big API responses would otherwise flood the model's context window.
 const MAX_MODEL_CHARS = Number(process.env.MCPHUB_MAX_TOOL_RESPONSE_CHARS) || 40_000
@@ -80,11 +80,12 @@ function failure(start: number, message: string): ExecResult {
 export async function executeTool(
   app: App,
   apiKey: string | undefined,
-  tool: McpTool,
+  appTool: McpTool,
   rawArgs: unknown
 ): Promise<ExecResult> {
   const start = Date.now()
-  const secrets = apiKey ? [apiKey] : []
+  const secrets = secretForms(apiKey)
+  const tool = toolForApp(app, appTool)
 
   let args: Record<string, unknown>
   let url: URL
@@ -115,7 +116,9 @@ export async function executeTool(
     }
   }
 
-  if (apiKey) {
+  if (apiKey && app.apiKeyIn === 'query') {
+    queryParams[app.apiKeyHeader] = apiKey
+  } else if (apiKey) {
     const value = app.apiKeyHeader.toLowerCase() === 'authorization' && !/^\w+\s/.test(apiKey) ? `Bearer ${apiKey}` : apiKey
     if (!isValidHeaderValue(value)) return failure(start, 'Stored credential contains characters not allowed in an HTTP header')
     headers[app.apiKeyHeader] = value
@@ -132,8 +135,10 @@ export async function executeTool(
   }
 
   const shown = new URL(url)
-  for (const [k, v] of Object.entries(queryParams)) shown.searchParams.set(k, v)
-  const request = { method: tool.method, url: shown.toString() }
+  for (const [k, v] of Object.entries(queryParams)) {
+    shown.searchParams.set(k, apiKey && app.apiKeyIn === 'query' && k === app.apiKeyHeader ? '[REDACTED]' : v)
+  }
+  const request = { method: tool.method, url: shown.toString().replace('%5BREDACTED%5D', '[REDACTED]') }
 
   try {
     const response = await safeRequest({

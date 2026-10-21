@@ -1,6 +1,6 @@
 import AjvModule, { type ValidateFunction } from 'ajv'
-import type { McpTool, ToolParameter } from '../types/index.js'
-import { isReservedHeader, isValidHeaderName, isValidHeaderValue, MAX_HEADER_VALUE_LENGTH } from '../security/headers.js'
+import type { App, McpTool, ToolParameter } from '../types/index.js'
+import { isReservedHeader, isValidCredentialHeader, isValidHeaderName, isValidHeaderValue, MAX_HEADER_VALUE_LENGTH } from '../security/headers.js'
 
 const Ajv = (AjvModule as any).default ?? AjvModule
 
@@ -26,6 +26,30 @@ export function isValidToolName(name: string): boolean {
 
 export function isValidParamName(name: string): boolean {
   return PARAM_NAME.test(name)
+}
+
+/** The credential travels in a header (header name) or a query parameter (parameter name). */
+export function isValidCredentialName(where: App['apiKeyIn'], name: string): boolean {
+  return where === 'query' ? PARAM_NAME.test(name) : isValidCredentialHeader(name)
+}
+
+/**
+ * The tool as callers and AI clients see it. When the app sends its key as a query parameter,
+ * a parameter with that name (specs often declare one) is hidden, so the model can neither
+ * read nor override the credential.
+ */
+export function toolForApp(app: Pick<App, 'apiKeyHeader' | 'apiKeyIn'>, tool: McpTool): McpTool {
+  if (app.apiKeyIn !== 'query') return tool
+  const credential = app.apiKeyHeader.toLowerCase()
+  const parameters = tool.parameters.filter(p => !(p.in === 'query' && p.name.toLowerCase() === credential))
+  return parameters.length === tool.parameters.length ? tool : { ...tool, parameters }
+}
+
+/** Forms a secret can take in output: as sent in a header, and URL-encoded in a query string. */
+export function secretForms(secret: string | undefined): string[] {
+  if (!secret) return []
+  const forms = new Set([secret, encodeURIComponent(secret), new URLSearchParams({ k: secret }).toString().slice(2)])
+  return [...forms]
 }
 
 export function sanitizeToolName(raw: string): string {

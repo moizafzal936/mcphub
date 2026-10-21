@@ -1,5 +1,6 @@
 import type { McpTool, ToolParameter } from '../types/index.js'
 import { isReservedHeader, isValidHeaderName } from '../security/headers.js'
+import { isSensitiveKey } from '../security/redact.js'
 import { ToolInputError, sanitizeToolName, validateToolPath } from './toolSchema.js'
 
 /** Splits a shell command into words: handles '…', "…", backslash escapes and line continuations. */
@@ -117,7 +118,7 @@ function singular(word: string): string {
 }
 
 /** Builds a tool definition from a curl command whose URL must sit under the app's base URL. */
-export function toolFromCurl(command: string, app: { id: string; baseUrl: string; apiKeyHeader: string }, overrides: { name?: string; description?: string }) {
+export function toolFromCurl(command: string, app: { id: string; baseUrl: string; apiKeyHeader: string; apiKeyIn?: 'header' | 'query' }, overrides: { name?: string; description?: string }) {
   const curl = parseCurl(command)
   const base = new URL(app.baseUrl)
   const basePath = base.pathname.replace(/\/+$/, '')
@@ -151,12 +152,20 @@ export function toolFromCurl(command: string, app: { id: string; baseUrl: string
   const pathError = validateToolPath(path)
   if (pathError) throw new ToolInputError(`Derived path rejected: ${pathError}`)
 
+  const skippedQuery: string[] = []
   for (const [key, value] of curl.url.searchParams) {
     if (used.has(key)) continue
-    params.push({ name: unique(key), in: 'query', description: `e.g. ${value}`.slice(0, 200), required: false, schema: { type: /^-?\d+$/.test(value) ? 'integer' : 'string' } })
+    // The app adds its own query credential, so the one pasted in the curl is dropped.
+    if (app.apiKeyIn === 'query' && key.toLowerCase() === app.apiKeyHeader.toLowerCase()) {
+      skippedQuery.push(key)
+      continue
+    }
+    // Tool descriptions are shown to AI clients: never copy a key-like value into one.
+    const example = isSensitiveKey(key) || /key|appid/i.test(key) ? key : `e.g. ${value}`.slice(0, 200)
+    params.push({ name: unique(key), in: 'query', description: example, required: false, schema: { type: /^-?\d+$/.test(value) ? 'integer' : 'string' } })
   }
 
-  const skippedHeaders = addHeaderParams(curl.headers, app.apiKeyHeader, params, used)
+  const skippedHeaders = [...addHeaderParams(curl.headers, app.apiKeyHeader, params, used), ...skippedQuery.map(k => `?${k}`)]
   const requestBodySchema = curl.body !== undefined && curl.method !== 'GET' ? bodySchemaFromJson(curl.body, used) : undefined
 
   const name = overrides.name ?? sanitizeToolName(`${curl.method.toLowerCase()}_${segments.filter(s => s && !ID_SEGMENT.test(s)).join('_')}`).toLowerCase()

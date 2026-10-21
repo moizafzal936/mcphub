@@ -151,6 +151,7 @@ export async function migrate(): Promise<{ encryptedLegacySecrets: number; orpha
   if (!appCols.has('owner_id')) await db.execute('ALTER TABLE apps ADD COLUMN owner_id TEXT')
   if (!appCols.has('rate_limit_per_min')) await db.execute('ALTER TABLE apps ADD COLUMN rate_limit_per_min INTEGER')
   if (!appCols.has('read_only')) await db.execute('ALTER TABLE apps ADD COLUMN read_only INTEGER NOT NULL DEFAULT 0')
+  if (!appCols.has('api_key_in')) await db.execute("ALTER TABLE apps ADD COLUMN api_key_in TEXT NOT NULL DEFAULT 'header'")
   await db.execute('CREATE INDEX IF NOT EXISTS idx_apps_owner ON apps(owner_id)')
   const userCols = await columns('users')
   if (!userCols.has('totp_secret')) await db.execute('ALTER TABLE users ADD COLUMN totp_secret TEXT')
@@ -280,6 +281,7 @@ function rowToApp(row: any): App {
     baseUrl: String(row.base_url),
     specUrl: row.spec_url == null ? undefined : String(row.spec_url),
     apiKeyHeader: String(row.api_key_header),
+    apiKeyIn: row.api_key_in === 'query' ? 'query' : 'header',
     hasApiKey: row.api_key != null && String(row.api_key) !== '',
     rateLimitPerMin: row.rate_limit_per_min == null ? null : Number(row.rate_limit_per_min),
     readOnly: Number(row.read_only ?? 0) === 1,
@@ -301,21 +303,22 @@ export const appRepo = {
 
   async insert(app: App, apiKey: string | undefined): Promise<void> {
     await getDb().execute({
-      sql: `INSERT INTO apps (id, owner_id, name, base_url, spec_url, api_key, api_key_header, rate_limit_per_min, read_only, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      sql: `INSERT INTO apps (id, owner_id, name, base_url, spec_url, api_key, api_key_header, api_key_in, rate_limit_per_min, read_only, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
         app.id, app.ownerId, app.name, app.baseUrl, app.specUrl ?? null,
         apiKey ? encryptSecret(apiKey, appSecretContext(app.id)) : null,
-        app.apiKeyHeader, app.rateLimitPerMin, app.readOnly ? 1 : 0, app.createdAt, app.updatedAt,
+        app.apiKeyHeader, app.apiKeyIn, app.rateLimitPerMin, app.readOnly ? 1 : 0, app.createdAt, app.updatedAt,
       ],
     })
   },
 
-  async update(id: string, ownerId: string, patch: { name?: string; apiKey?: string | null; apiKeyHeader?: string; rateLimitPerMin?: number | null; readOnly?: boolean }): Promise<void> {
+  async update(id: string, ownerId: string, patch: { name?: string; apiKey?: string | null; apiKeyHeader?: string; apiKeyIn?: 'header' | 'query'; rateLimitPerMin?: number | null; readOnly?: boolean }): Promise<void> {
     const sets: string[] = []
     const args: (string | number | null)[] = []
     if (patch.name !== undefined) { sets.push('name = ?'); args.push(patch.name) }
     if (patch.apiKeyHeader !== undefined) { sets.push('api_key_header = ?'); args.push(patch.apiKeyHeader) }
+    if (patch.apiKeyIn !== undefined) { sets.push('api_key_in = ?'); args.push(patch.apiKeyIn) }
     if (patch.rateLimitPerMin !== undefined) { sets.push('rate_limit_per_min = ?'); args.push(patch.rateLimitPerMin) }
     if (patch.readOnly !== undefined) { sets.push('read_only = ?'); args.push(patch.readOnly ? 1 : 0) }
     if (patch.apiKey !== undefined) {

@@ -1,6 +1,7 @@
 import { nanoid } from 'nanoid'
 import type { McpTool, ToolParameter } from '../types/index.js'
-import { MAX_TOOLS_PER_APP, sanitizeToolName, validateToolPath } from './toolSchema.js'
+import { MAX_TOOLS_PER_APP, isValidParamName, sanitizeToolName, validateToolPath } from './toolSchema.js'
+import { isSensitiveKey } from '../security/redact.js'
 import { addHeaderParams, bodySchemaFromJson } from './curl.js'
 
 export function isPostmanCollection(doc: unknown): boolean {
@@ -11,7 +12,7 @@ export function isPostmanCollection(doc: unknown): boolean {
 const VAR = /^\{\{\s*([A-Za-z0-9_.-]+)\s*\}\}$/
 
 /** Converts a Postman v2.x collection into tools. Hosts are ignored: calls always go to the app's base URL. */
-export function toolsFromPostman(doc: any, app: { id: string; baseUrl: string; apiKeyHeader: string }): { tools: McpTool[]; skipped: string[] } {
+export function toolsFromPostman(doc: any, app: { id: string; baseUrl: string; apiKeyHeader: string; apiKeyIn?: 'header' | 'query' }): { tools: McpTool[]; skipped: string[] } {
   const basePath = new URL(app.baseUrl).pathname.replace(/\/+$/, '').split('/').filter(Boolean)
   const tools: McpTool[] = []
   const skipped: string[] = []
@@ -54,10 +55,14 @@ export function toolsFromPostman(doc: any, app: { id: string; baseUrl: string; a
       }
 
       for (const q of Array.isArray(url?.query) ? url.query : []) {
-        if (!q?.key || q.disabled || used.has(q.key)) continue
-        used.add(q.key)
+        const key = typeof q?.key === 'string' ? q.key : ''
+        if (!key || q.disabled || used.has(key)) continue
+        if (!isValidParamName(key) || (app.apiKeyIn === 'query' && key.toLowerCase() === app.apiKeyHeader.toLowerCase())) continue
+        used.add(key)
         const example = String(q.value ?? '')
-        params.push({ name: q.key, in: 'query', description: String(q.description ?? `e.g. ${example}`).slice(0, 200), required: false, schema: { type: /^-?\d+$/.test(example) ? 'integer' : 'string' } })
+        // Tool descriptions are shown to AI clients: never copy a key-like value into one.
+        const fallback = isSensitiveKey(key) || /key|appid/i.test(key) ? key : `e.g. ${example}`
+        params.push({ name: key, in: 'query', description: String(q.description ?? fallback).slice(0, 200), required: false, schema: { type: /^-?\d+$/.test(example) ? 'integer' : 'string' } })
       }
       const headers: [string, string][] = (Array.isArray(req.header) ? req.header : []).filter((h: any) => h?.key && !h.disabled).map((h: any) => [String(h.key), String(h.value ?? '')])
       addHeaderParams(headers, app.apiKeyHeader, params, used)

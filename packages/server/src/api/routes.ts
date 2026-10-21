@@ -7,10 +7,10 @@ import { toolFromCurl } from '../ingestion/curl.js'
 import { isPostmanCollection, toolsFromPostman } from '../ingestion/postman.js'
 import { appConfigSchema, exportAppConfig, toolsFromConfig } from '../ingestion/appConfig.js'
 import {
-  MAX_TOOLS_PER_APP, ToolInputError, isValidParamName, isValidToolName, pathPlaceholders, sanitizeParameters, validateToolPath,
+  MAX_TOOLS_PER_APP, ToolInputError, isValidCredentialName, isValidParamName, isValidToolName, pathPlaceholders, sanitizeParameters,
+  toolForApp, validateToolPath,
 } from '../ingestion/toolSchema.js'
 import { assertResolvesPublic, parseOutboundUrl, SsrfBlockedError } from '../security/ssrf.js'
-import { isValidCredentialHeader } from '../security/headers.js'
 import { asyncHandler, HttpError } from '../http/errors.js'
 import { issueMcpToken, requireUser } from '../auth/auth.js'
 import { closeSessions } from '../mcp-host/server.js'
@@ -33,7 +33,20 @@ const baseUrlSchema = z.string().trim().max(2048).superRefine((value, ctx) => {
   }
 })
 
-const credentialHeaderSchema = z.string().trim().max(256).refine(isValidCredentialHeader, 'Invalid or reserved header name')
+const credentialNameSchema = z.string().trim().min(1).max(256)
+const credentialInSchema = z.enum(['header', 'query'])
+
+/** Resolves and checks where the upstream key goes: a header (default Authorization) or a query parameter. */
+function credentialSetting(where: App['apiKeyIn'] | undefined, name: string | undefined): { apiKeyIn: App['apiKeyIn']; apiKeyHeader: string } {
+  const apiKeyIn = where ?? 'header'
+  const apiKeyHeader = name ?? (apiKeyIn === 'query' ? 'api_key' : 'Authorization')
+  if (!isValidCredentialName(apiKeyIn, apiKeyHeader)) {
+    throw new HttpError(400, apiKeyIn === 'query'
+      ? 'Query parameter name must be 1-128 letters, digits, "_", "-", ".", "[" or "]"'
+      : 'Invalid or reserved header name')
+  }
+  return { apiKeyIn, apiKeyHeader }
+}
 const rateLimitSchema = z.number().int().min(1).max(100_000).nullable()
 
 const createAppSchema = z.object({
@@ -41,14 +54,16 @@ const createAppSchema = z.object({
   baseUrl: baseUrlSchema,
   specUrl: z.string().trim().url().max(2048).optional().or(z.literal('').transform(() => undefined)),
   apiKey: z.string().max(4096).optional().or(z.literal('').transform(() => undefined)),
-  apiKeyHeader: credentialHeaderSchema.optional().default('Authorization'),
+  apiKeyHeader: credentialNameSchema.optional(),
+  apiKeyIn: credentialInSchema.optional(),
   rateLimitPerMin: rateLimitSchema.optional().default(null),
 })
 
 const updateAppSchema = z.object({
   name: z.string().trim().min(1).max(100).optional(),
   apiKey: z.string().max(4096).nullable().optional(),
-  apiKeyHeader: credentialHeaderSchema.optional(),
+  apiKeyHeader: credentialNameSchema.optional(),
+  apiKeyIn: credentialInSchema.optional(),
   rateLimitPerMin: rateLimitSchema.optional(),
   readOnly: z.boolean().optional(),
 }).strict()
@@ -145,6 +160,7 @@ router.get('/apps/:id', asyncHandler(async (req, res) => {
 
 router.post('/apps', asyncHandler(async (req, res) => {
   const input = createAppSchema.parse(req.body)
+  const credential = credentialSetting(input.apiKeyIn, input.apiKeyHeader)
   await ensurePublicTarget(input.baseUrl, 'Base URL')
   if (input.specUrl) parseOutboundUrl(input.specUrl)
 
@@ -155,7 +171,7 @@ router.post('/apps', asyncHandler(async (req, res) => {
     name: input.name,
     baseUrl: input.baseUrl.replace(/\/+$/, ''),
     specUrl: input.specUrl,
-    apiKeyHeader: input.apiKeyHeader,
+    ...credential,
     hasApiKey: !!input.apiKey,
     rateLimitPerMin: input.rateLimitPerMin,
     readOnly: false,
@@ -178,6 +194,9 @@ router.post('/apps', asyncHandler(async (req, res) => {
 router.patch('/apps/:id', asyncHandler(async (req, res) => {
   const app = await ownedApp(req)
   const patch = updateAppSchema.parse(req.body)
+  if (patch.apiKeyIn !== undefined || patch.apiKeyHeader !== undefined) {
+    Object.assign(patch, credentialSetting(patch.apiKeyIn ?? app.apiKeyIn, patch.apiKeyHeader ?? (patch.apiKeyIn && patch.apiKeyIn !== app.apiKeyIn ? undefined : app.apiKeyHeader)))
+  }
   await appRepo.update(app.id, req.user!.id, patch)
   const updated = (await appRepo.findForOwner(app.id, req.user!.id))!
   res.json(publicApp(updated))
@@ -238,19 +257,20 @@ router.post('/apps/import-config', express.text({ type: () => true, limit: '5mb'
   } catch {
     throw new HttpError(422, 'Import failed: the file is not valid JSON')
   }
-  let config, settings, specUrl: string | undefined
+  let config, settings, credential, specUrl: string | undefined
   try {
     config = appConfigSchema.parse(doc)
-    settings = createAppSchema.pick({ name: true, baseUrl: true, apiKeyHeader: true, rateLimitPerMin: true }).parse({
+    settings = createAppSchema.pick({ name: true, baseUrl: true, rateLimitPerMin: true }).parse({
       name: config.app.name,
       baseUrl: config.app.baseUrl,
-      apiKeyHeader: config.app.apiKeyHeader,
       rateLimitPerMin: config.app.rateLimitPerMin ?? null,
     })
+    credential = credentialSetting(config.app.apiKeyIn, config.app.apiKeyHeader)
     specUrl = config.app.specUrl ? z.string().trim().url().max(2048).parse(config.app.specUrl) : undefined
     if (specUrl) parseOutboundUrl(specUrl)
   } catch (err: any) {
     if (err?.code === 'SSRF_BLOCKED') throw new HttpError(422, `Import failed: spec URL: ${err.message}`)
+    if (err instanceof HttpError) throw new HttpError(422, `Import failed: app.apiKeyHeader: ${err.message}`)
     if (!(err instanceof z.ZodError)) throw err
     const issue = err.issues[0]
     throw new HttpError(422, `Import failed: ${issue.path.length ? `${issue.path.join('.')}: ` : ''}${issue.message}`)
@@ -264,7 +284,7 @@ router.post('/apps/import-config', express.text({ type: () => true, limit: '5mb'
     name: settings.name,
     baseUrl: settings.baseUrl.replace(/\/+$/, ''),
     specUrl,
-    apiKeyHeader: settings.apiKeyHeader,
+    ...credential,
     hasApiKey: false,
     rateLimitPerMin: settings.rateLimitPerMin,
     readOnly: config.app.readOnly ?? false,
@@ -287,7 +307,7 @@ router.post('/apps/import-config', express.text({ type: () => true, limit: '5mb'
 
 router.get('/apps/:id/tools', asyncHandler(async (req, res) => {
   const app = await ownedApp(req)
-  res.json(await toolRepo.findAllByAppId(app.id))
+  res.json((await toolRepo.findAllByAppId(app.id)).map(t => toolForApp(app, t)))
 }))
 
 router.post('/apps/:id/tools', asyncHandler(async (req, res) => {

@@ -78,9 +78,9 @@ export function ToolTester({ appId, tools }: ToolTesterProps) {
     : []
 
   return (
-    <div className="flex h-full min-h-0 gap-0 border border-gray-800 rounded-xl overflow-hidden">
-      {/* Tool list */}
-      <div className="w-64 flex-shrink-0 border-r border-gray-800 flex flex-col bg-gray-950">
+    <div className="flex flex-col md:flex-row h-full min-h-0 gap-0 border border-gray-800 rounded-xl overflow-hidden">
+      {/* Tool list (stacked above the runner on narrow screens) */}
+      <div className="md:w-64 max-h-48 md:max-h-none flex-shrink-0 border-b md:border-b-0 md:border-r border-gray-800 flex flex-col bg-gray-950">
         <div className="p-3 border-b border-gray-800">
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500" />
@@ -131,7 +131,7 @@ export function ToolTester({ appId, tools }: ToolTesterProps) {
                 <span className={`text-xs font-bold px-2 py-1 rounded border ${methodColor(selected.method)}`}>
                   {selected.method}
                 </span>
-                <code className="text-sm text-gray-300 font-mono">{selected.path}</code>
+                <code className="text-sm text-gray-300 font-mono break-all">{selected.path}</code>
               </div>
               <p className="text-xs text-gray-500 mt-1.5 leading-relaxed">{selected.description}</p>
             </div>
