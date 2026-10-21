@@ -3,6 +3,13 @@ import { Link } from 'react-router-dom'
 import { Plus, Zap, Trash2, ExternalLink, Activity, Clock } from 'lucide-react'
 import { api, apiError, type App } from '../lib/api.ts'
 import { useToast } from '../components/Toast.tsx'
+import { CopyButton } from '../components/CopyButton.tsx'
+
+// The Vite dev proxy runs on :3000; MCP clients connect to the API server directly.
+function mcpUrlFor(appId: string): string {
+  const origin = window.location.port === '3000' ? window.location.origin.replace(':3000', ':3001') : window.location.origin
+  return `${origin}/mcp/${appId}`
+}
 
 function timeAgo(ts: number | null) {
   if (!ts) return null
@@ -145,6 +152,10 @@ export default function AppsPage() {
                   )}
                 </div>
                 <p className="text-xs text-gray-600 truncate mt-0.5 font-mono">{app.baseUrl}</p>
+                <div className="flex items-center gap-1.5 mt-1 text-[11px] text-gray-500" onClick={e => e.preventDefault()}>
+                  <span className="truncate font-mono">MCP: {mcpUrlFor(app.id)}</span>
+                  <CopyButton text={mcpUrlFor(app.id)} />
+                </div>
                 {ago && (
                   <p className="text-xs text-gray-700 mt-0.5 flex items-center gap-1">
                     <Clock className="w-3 h-3" />
