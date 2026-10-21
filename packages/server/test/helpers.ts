@@ -69,6 +69,8 @@ export async function startFixtures(): Promise<Fixtures> {
         return redirect(`http://127.0.0.1:${internalPort}/secret`)
       case url.pathname === '/v1/redirect-cross':
         return redirect(`http://localhost:${upstreamPort}/v1/echo`)
+      case url.pathname === '/v1/unauthorized':
+        return json(401, { error: 'invalid api key' })
       case url.pathname === '/v1/many':
         return json(200, Array.from({ length: 2000 }, (_, i) => ({ id: i, name: `item-${i}`, note: 'x'.repeat(60) })))
       case url.pathname === '/v1/wrapped':

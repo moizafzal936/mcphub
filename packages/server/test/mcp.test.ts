@@ -252,3 +252,16 @@ test('large responses are trimmed to whole items for AI clients, with a note', a
   assert.ok(body.results.length > 50 && body.results.length < 2000)
   await client.close()
 })
+
+test('upstream auth failures tell the AI client how to fix them', async () => {
+  const app = await createApp(alice, fx, { apiKey: 'sk-wrong-key-1234567' })
+  await addTool(alice, app.id, { name: 'secure', path: '/unauthorized' })
+  const { token } = await mintToken(alice, app.id)
+  const client = await connectHttp(app.id, token)
+  const result: any = await client.callTool({ name: 'secure', arguments: {} })
+  assert.equal(result.isError, true)
+  assert.match(result.content[0].text, /HTTP 401/)
+  assert.match(result.content[0].text, /check or replace the API key in the app's Settings/)
+  assert.ok(!result.content[0].text.includes('sk-wrong-key'))
+  await client.close()
+})

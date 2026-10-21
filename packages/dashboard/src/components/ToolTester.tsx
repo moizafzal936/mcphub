@@ -195,6 +195,11 @@ export function ToolTester({ appId, tools }: ToolTesterProps) {
                   <span className="text-xs text-gray-500">{result.durationMs}ms</span>
                   <span className="text-xs text-gray-600 ml-auto">Response</span>
                 </div>
+                {(result.statusCode === 401 || result.statusCode === 403) && (
+                  <div className="px-5 py-2 border-b border-gray-800 flex-shrink-0 text-xs text-amber-300 bg-amber-950/30">
+                    The API rejected the stored credential. Check or replace the API key in this app's Settings tab.
+                  </div>
+                )}
                 {result.request && (
                   <div className="px-5 py-2 border-b border-gray-800 flex-shrink-0 text-[11px] font-mono text-gray-500 break-all" title="Sent upstream (credential header not shown)">
                     <span className="text-gray-400">{result.request.method}</span> {result.request.url}

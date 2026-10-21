@@ -139,10 +139,13 @@ function buildMcpServer(appId: string, appName: string, userId: string): Server 
 
     const result = await runTool(app, tool, request.params.arguments ?? {}, `token:${auth.tokenId}`)
     const isError = result.statusCode === 0 || result.statusCode >= 400
+    const authHint = result.statusCode === 401 || result.statusCode === 403
+      ? `\n\n${app.name} rejected MCPHub's stored credential (HTTP ${result.statusCode}). Tell the user to check or replace the API key in the app's Settings in MCPHub.`
+      : ''
     return {
       content: [{
         type: 'text' as const,
-        text: isError && result.statusCode !== 0 ? `HTTP ${result.statusCode} Error:\n${result.text}` : result.text,
+        text: isError && result.statusCode !== 0 ? `HTTP ${result.statusCode} Error:\n${result.text}${authHint}` : result.text,
       }],
       isError,
     }
