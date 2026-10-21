@@ -23,6 +23,8 @@ export interface McpTool {
   path: string
   parameters: ToolParameter[]
   requestBodySchema?: Record<string, unknown>
+  /** Dotted paths kept in successful responses sent to AI clients (arrays are traversed). */
+  responseFields?: string[]
   enabled: boolean
 }
 

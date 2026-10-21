@@ -2,7 +2,7 @@ import type { App, McpTool } from '../types/index.js'
 import { safeRequest, SsrfBlockedError } from '../security/ssrf.js'
 import { isReservedHeader, isValidHeaderValue } from '../security/headers.js'
 import { redactString } from '../security/redact.js'
-import { ToolInputError, buildUpstreamUrl, secretForms, toolForApp, validateToolArgs } from './toolSchema.js'
+import { ToolInputError, buildUpstreamUrl, projectResponse, secretForms, toolForApp, validateToolArgs } from './toolSchema.js'
 
 // What AI clients receive. Big API responses would otherwise flood the model's context window.
 const MAX_MODEL_CHARS = Number(process.env.MCPHUB_MAX_TOOL_RESPONSE_CHARS) || 40_000
@@ -19,6 +19,8 @@ export interface ExecResult {
   error?: string
   /** What was sent upstream (no headers, so never the credential). Shown to the owner only. */
   request?: { method: string; url: string }
+  /** True when `text` (what AI clients get) was cut down to the tool's chosen response fields. */
+  shaped?: boolean
 }
 
 function fitArray(items: unknown[], budget: number): { kept: unknown[]; omitted: number } {
@@ -158,7 +160,13 @@ export async function executeTool(
     try {
       parsed = JSON.parse(scrubbed)
     } catch {}
-    return { data: parsed, statusCode: response.status, durationMs: Date.now() - start, text: formatForModel(parsed), request }
+    // Shape only successful responses: error bodies must reach the model intact.
+    const ok = response.status >= 200 && response.status < 300
+    const forModel = ok && tool.responseFields?.length ? projectResponse(parsed, tool.responseFields) : parsed
+    return {
+      data: parsed, statusCode: response.status, durationMs: Date.now() - start, text: formatForModel(forModel), request,
+      ...(forModel !== parsed ? { shaped: true } : {}),
+    }
   } catch (err: any) {
     if (err instanceof SsrfBlockedError || err?.cause instanceof SsrfBlockedError || err?.code === 'SSRF_BLOCKED') {
       return failure(start, 'Request blocked: destination is not a public address')

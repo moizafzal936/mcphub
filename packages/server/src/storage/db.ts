@@ -151,6 +151,8 @@ export async function migrate(): Promise<{ encryptedLegacySecrets: number; orpha
   if (!appCols.has('owner_id')) await db.execute('ALTER TABLE apps ADD COLUMN owner_id TEXT')
   if (!appCols.has('rate_limit_per_min')) await db.execute('ALTER TABLE apps ADD COLUMN rate_limit_per_min INTEGER')
   if (!appCols.has('read_only')) await db.execute('ALTER TABLE apps ADD COLUMN read_only INTEGER NOT NULL DEFAULT 0')
+  const toolCols = await columns('mcp_tools')
+  if (!toolCols.has('response_fields')) await db.execute('ALTER TABLE mcp_tools ADD COLUMN response_fields TEXT')
   if (!appCols.has('api_key_in')) await db.execute("ALTER TABLE apps ADD COLUMN api_key_in TEXT NOT NULL DEFAULT 'header'")
   await db.execute('CREATE INDEX IF NOT EXISTS idx_apps_owner ON apps(owner_id)')
   const userCols = await columns('users')
@@ -380,6 +382,7 @@ function rowToTool(row: any): McpTool {
     path: String(row.path),
     parameters: JSON.parse(String(row.parameters)),
     requestBodySchema: row.request_body_schema ? JSON.parse(String(row.request_body_schema)) : undefined,
+    ...(row.response_fields ? { responseFields: JSON.parse(String(row.response_fields)) } : {}),
     enabled: Number(row.enabled) === 1,
   }
 }
@@ -413,12 +416,13 @@ export const toolRepo = {
   async insertMany(tools: McpTool[]): Promise<void> {
     if (!tools.length) return
     await getDb().batch(tools.map(t => ({
-      sql: `INSERT INTO mcp_tools (id, app_id, name, description, method, path, parameters, request_body_schema, enabled)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      sql: `INSERT INTO mcp_tools (id, app_id, name, description, method, path, parameters, request_body_schema, response_fields, enabled)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
         t.id, t.appId, t.name, t.description, t.method, t.path,
         JSON.stringify(t.parameters),
         t.requestBodySchema ? JSON.stringify(t.requestBodySchema) : null,
+        t.responseFields?.length ? JSON.stringify(t.responseFields) : null,
         t.enabled ? 1 : 0,
       ],
     })), 'write')
@@ -428,12 +432,13 @@ export const toolRepo = {
     await getDb().batch([
       { sql: 'DELETE FROM mcp_tools WHERE app_id = ?', args: [appId] },
       ...tools.map(t => ({
-        sql: `INSERT INTO mcp_tools (id, app_id, name, description, method, path, parameters, request_body_schema, enabled)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        sql: `INSERT INTO mcp_tools (id, app_id, name, description, method, path, parameters, request_body_schema, response_fields, enabled)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
           t.id, appId, t.name, t.description, t.method, t.path,
           JSON.stringify(t.parameters),
           t.requestBodySchema ? JSON.stringify(t.requestBodySchema) : null,
+          t.responseFields?.length ? JSON.stringify(t.responseFields) : null,
           t.enabled ? 1 : 0,
         ],
       })),
@@ -443,15 +448,19 @@ export const toolRepo = {
   async updateInApp(
     appId: string,
     toolId: string,
-    patch: { enabled?: boolean; name?: string; description?: string; parameters?: McpTool['parameters']; requestBodySchema?: Record<string, unknown> }
+    patch: {
+      enabled?: boolean; name?: string; description?: string; parameters?: McpTool['parameters']
+      requestBodySchema?: Record<string, unknown>; responseFields?: string[] | null
+    }
   ): Promise<boolean> {
     const sets: string[] = []
-    const args: (string | number)[] = []
+    const args: (string | number | null)[] = []
     if (patch.enabled !== undefined) { sets.push('enabled = ?'); args.push(patch.enabled ? 1 : 0) }
     if (patch.name !== undefined) { sets.push('name = ?'); args.push(patch.name) }
     if (patch.description !== undefined) { sets.push('description = ?'); args.push(patch.description) }
     if (patch.parameters !== undefined) { sets.push('parameters = ?'); args.push(JSON.stringify(patch.parameters)) }
     if (patch.requestBodySchema !== undefined) { sets.push('request_body_schema = ?'); args.push(JSON.stringify(patch.requestBodySchema)) }
+    if (patch.responseFields !== undefined) { sets.push('response_fields = ?'); args.push(patch.responseFields?.length ? JSON.stringify(patch.responseFields) : null) }
     if (!sets.length) return true
     args.push(toolId, appId)
     const res = await getDb().execute({ sql: `UPDATE mcp_tools SET ${sets.join(', ')} WHERE id = ? AND app_id = ?`, args })

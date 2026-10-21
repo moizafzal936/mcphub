@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import type { App, McpTool } from '../types/index.js'
 import {
-  MAX_PARAMS_PER_TOOL, MAX_TOOLS_PER_APP, ToolInputError, isValidParamName, isValidToolName, normalizeType,
+  MAX_PARAMS_PER_TOOL, MAX_RESPONSE_FIELDS, MAX_TOOLS_PER_APP, ToolInputError, isValidFieldPath, isValidParamName, isValidToolName, normalizeType,
   pathPlaceholders, sanitizeParameters, validateToolPath,
 } from './toolSchema.js'
 
@@ -53,6 +53,7 @@ const toolSchema = z.object({
   path: z.string(),
   parameters: z.array(z.unknown()).max(MAX_PARAMS_PER_TOOL).optional().default([]),
   requestBodySchema: z.record(z.string(), z.unknown()).nullable().optional(),
+  responseFields: z.array(z.string()).max(MAX_RESPONSE_FIELDS).optional(),
   enabled: z.boolean().optional().default(true),
 })
 
@@ -120,6 +121,11 @@ export function toolsFromConfig(config: ParsedAppConfig, appId: string, credenti
       }
     }
     const requestBodySchema = raw.method === 'GET' ? undefined : normalizeBodySchema(raw.requestBodySchema)
+    const responseFields = [...new Set(raw.responseFields ?? [])].filter(f => {
+      if (isValidFieldPath(f)) return true
+      skipped.push(`${raw.name}: response field "${f.slice(0, 80)}"`)
+      return false
+    })
     tools.push({
       id: newId(),
       appId,
@@ -129,6 +135,7 @@ export function toolsFromConfig(config: ParsedAppConfig, appId: string, credenti
       path: raw.path,
       parameters: params,
       ...(requestBodySchema ? { requestBodySchema } : {}),
+      ...(responseFields.length ? { responseFields } : {}),
       enabled: raw.enabled,
     })
   }

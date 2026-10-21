@@ -228,3 +228,59 @@ export function buildUpstreamUrl(baseUrl: string, tool: McpTool, args: Record<st
   }
   return url
 }
+
+// ── Response shaping ───────────────────────────────────────────────────────────
+
+export const MAX_RESPONSE_FIELDS = 100
+const FIELD_SEGMENT = /^[A-Za-z0-9_$@-]{1,64}$/
+const UNSAFE_KEYS = new Set(['__proto__', 'prototype', 'constructor'])
+
+/** A response field path: up to 10 dot-separated JSON keys, e.g. "docs.title". */
+export function isValidFieldPath(path: string): boolean {
+  if (typeof path !== 'string' || path.length > 256) return false
+  const parts = path.split('.')
+  return parts.length <= 10 && parts.every(p => FIELD_SEGMENT.test(p) && !UNSAFE_KEYS.has(p))
+}
+
+interface FieldTrie { leaf: boolean; children: Map<string, FieldTrie> }
+
+function pick(value: unknown, node: FieldTrie): unknown {
+  if (node.leaf) return value
+  if (Array.isArray(value)) return value.map(v => pick(v, node))
+  if (!value || typeof value !== 'object') return undefined
+  const out: Record<string, unknown> = {}
+  for (const [key, child] of node.children) {
+    if (!Object.hasOwn(value, key)) continue
+    const picked = pick((value as Record<string, unknown>)[key], child)
+    if (picked !== undefined) out[key] = picked
+  }
+  return out
+}
+
+function isEmptyShape(value: unknown): boolean {
+  if (value === undefined) return true
+  if (Array.isArray(value)) return value.every(isEmptyShape)
+  return !!value && typeof value === 'object' && Object.keys(value).length === 0
+}
+
+/**
+ * Keeps only the listed fields. Arrays are traversed, so "docs.title" keeps the title of every
+ * doc. If nothing matches (the API changed shape), the full response is returned rather than an
+ * empty one, so the model is never left with nothing.
+ */
+export function projectResponse(data: unknown, paths: string[]): unknown {
+  const root: FieldTrie = { leaf: false, children: new Map() }
+  for (const path of paths) {
+    if (!isValidFieldPath(path)) continue
+    let node = root
+    for (const seg of path.split('.')) {
+      let next = node.children.get(seg)
+      if (!next) node.children.set(seg, (next = { leaf: false, children: new Map() }))
+      node = next
+    }
+    node.leaf = true
+  }
+  if (!root.children.size || !data || typeof data !== 'object') return data
+  const shaped = pick(data, root)
+  return isEmptyShape(shaped) ? data : shaped
+}

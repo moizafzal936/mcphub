@@ -1,11 +1,13 @@
 import { useState } from 'react'
-import { Play, Loader2, CheckCircle, XCircle, Search, ChevronRight } from 'lucide-react'
+import { Play, Loader2, CheckCircle, XCircle, Search, ChevronRight, Scissors } from 'lucide-react'
 import { api, apiError, type ExecResult, type McpTool } from '../lib/api.ts'
 import { useToast } from './Toast.tsx'
+import { ResponseShapeModal } from './ResponseShapeModal.tsx'
 
 interface ToolTesterProps {
   appId: string
   tools: McpTool[]
+  onToolUpdated?: (tool: McpTool) => void
 }
 
 function methodColor(method: string) {
@@ -19,13 +21,16 @@ function methodColor(method: string) {
   return colors[method] ?? 'bg-gray-800 text-gray-400 border-gray-700'
 }
 
-export function ToolTester({ appId, tools }: ToolTesterProps) {
+export function ToolTester({ appId, tools, onToolUpdated }: ToolTesterProps) {
   const { success, error } = useToast()
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<McpTool | null>(tools[0] ?? null)
   const [args, setArgs] = useState<Record<string, string>>({})
   const [running, setRunning] = useState(false)
   const [result, setResult] = useState<ExecResult | null>(null)
+  const [view, setView] = useState<'ai' | 'full'>('full')
+  const [shaping, setShaping] = useState(false)
+  const canShape = !!result && result.statusCode >= 200 && result.statusCode < 300 && !!result.data && typeof result.data === 'object'
 
   const filtered = tools.filter(t =>
     t.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -46,6 +51,7 @@ export function ToolTester({ appId, tools }: ToolTesterProps) {
     try {
       const res = await api.tools.execute(appId, selected.id, args)
       setResult(res)
+      setView(res.shaped ? 'ai' : 'full')
       if (res.statusCode === 0) {
         error('Tool call failed', res.error ?? 'Request was not sent')
       } else if (res.statusCode < 400) {
@@ -184,7 +190,7 @@ export function ToolTester({ appId, tools }: ToolTesterProps) {
             {/* Result — always visible, fixed height at bottom */}
             {result && (
               <div className="flex-shrink-0 border-t-2 border-gray-700 bg-gray-950 flex flex-col max-h-64">
-                <div className="flex items-center gap-3 px-5 py-2.5 border-b border-gray-800 flex-shrink-0">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-5 py-2.5 border-b border-gray-800 flex-shrink-0">
                   {result.statusCode > 0 && result.statusCode < 400
                     ? <CheckCircle className="w-4 h-4 text-green-400" />
                     : <XCircle className="w-4 h-4 text-red-400" />
@@ -193,7 +199,23 @@ export function ToolTester({ appId, tools }: ToolTesterProps) {
                     {result.statusCode || 'ERR'}
                   </span>
                   <span className="text-xs text-gray-500">{result.durationMs}ms</span>
-                  <span className="text-xs text-gray-600 ml-auto">Response</span>
+                  <div className="ml-auto flex items-center gap-2">
+                    <div className="flex rounded-md border border-gray-800 overflow-hidden text-[11px]" role="group" aria-label="Response view">
+                      {(['ai', 'full'] as const).map(v => (
+                        <button key={v} onClick={() => setView(v)} aria-pressed={view === v}
+                          className={`px-2 py-0.5 whitespace-nowrap ${view === v ? 'bg-gray-800 text-white' : 'text-gray-500 hover:text-gray-300'}`}>
+                          {v === 'ai' ? 'AI sees' : 'Full response'}
+                        </button>
+                      ))}
+                    </div>
+                    {canShape && (
+                      <button onClick={() => setShaping(true)} className="flex items-center gap-1 text-[11px] text-brand-400 hover:text-brand-300 whitespace-nowrap"
+                        title="Choose which fields AI clients receive">
+                        <Scissors className="w-3 h-3" />
+                        {selected.responseFields?.length ? `${selected.responseFields.length} fields` : 'Fields for AI'}
+                      </button>
+                    )}
+                  </div>
                 </div>
                 {(result.statusCode === 401 || result.statusCode === 403) && (
                   <div className="px-5 py-2 border-b border-gray-800 flex-shrink-0 text-xs text-amber-300 bg-amber-950/30">
@@ -205,10 +227,25 @@ export function ToolTester({ appId, tools }: ToolTesterProps) {
                     <span className="text-gray-400">{result.request.method}</span> {result.request.url}
                   </div>
                 )}
+                {view === 'ai' && result.shaped && (
+                  <div className="px-5 py-1.5 border-b border-gray-800 flex-shrink-0 text-[11px] text-green-400">
+                    Shaped to the chosen fields: {result.text.length.toLocaleString()} of {JSON.stringify(result.data, null, 2).length.toLocaleString()} characters
+                  </div>
+                )}
                 <pre className="flex-1 overflow-auto p-4 text-xs text-gray-300 font-mono leading-relaxed">
-                  {JSON.stringify(result.data, null, 2)}
+                  {view === 'ai' ? result.text : JSON.stringify(result.data, null, 2)}
                 </pre>
               </div>
+            )}
+            {shaping && result && (
+              <ResponseShapeModal
+                appId={appId} tool={selected} sample={result.data} onClose={() => setShaping(false)}
+                onSaved={responseFields => {
+                  const updated = { ...selected, responseFields }
+                  setSelected(updated)
+                  onToolUpdated?.(updated)
+                }}
+              />
             )}
           </>
         )}

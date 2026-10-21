@@ -65,6 +65,7 @@ export interface McpTool {
   path: string
   parameters: ToolParameter[]
   requestBodySchema?: Record<string, unknown>
+  responseFields?: string[]
   enabled: boolean
 }
 
@@ -145,6 +146,8 @@ export interface ExecResult {
   text: string
   error?: string
   request?: { method: string; url: string }
+  /** `text` (what AI clients get) was cut down to the tool's response fields. */
+  shaped?: boolean
 }
 
 export const api = {
@@ -198,6 +201,8 @@ export const api = {
       http.patch(`/apps/${appId}/tools/${toolId}`, data).then(r => r.data),
     delete: (appId: string, toolId: string) =>
       http.delete(`/apps/${appId}/tools/${toolId}`).then(r => r.data),
+    setResponseFields: (appId: string, toolId: string, responseFields: string[] | null) =>
+      http.patch(`/apps/${appId}/tools/${toolId}`, { responseFields }).then(r => r.data),
     readiness: (appId: string) => http.get<Readiness>(`/apps/${appId}/readiness`).then(r => r.data),
     stats: (appId: string) =>
       http.get<{ toolName: string; calls: number; errors: number; avgMs: number; lastCalledAt: number }[]>(`/apps/${appId}/tool-stats`).then(r => r.data),

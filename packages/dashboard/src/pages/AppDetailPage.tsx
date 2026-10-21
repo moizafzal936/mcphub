@@ -702,7 +702,7 @@ export default function AppDetailPage() {
               No enabled tools to test. Enable some tools first.
             </div>
           ) : (
-            <ToolTester appId={app.id} tools={tools.filter(t => t.enabled)} />
+            <ToolTester appId={app.id} tools={tools.filter(t => t.enabled)} onToolUpdated={tool => setTools(ts => ts.map(t => (t.id === tool.id ? tool : t)))} />
           )}
         </div>
       )}

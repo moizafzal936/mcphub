@@ -8,7 +8,7 @@ import { isPostmanCollection, toolsFromPostman } from '../ingestion/postman.js'
 import { appConfigSchema, exportAppConfig, toolsFromConfig } from '../ingestion/appConfig.js'
 import { assessReadiness } from '../ingestion/readiness.js'
 import {
-  MAX_TOOLS_PER_APP, ToolInputError, isValidCredentialName, isValidParamName, isValidToolName, pathPlaceholders, sanitizeParameters,
+  MAX_RESPONSE_FIELDS, MAX_TOOLS_PER_APP, ToolInputError, isValidCredentialName, isValidFieldPath, isValidParamName, isValidToolName, pathPlaceholders, sanitizeParameters,
   toolForApp, validateToolPath,
 } from '../ingestion/toolSchema.js'
 import { assertResolvesPublic, parseOutboundUrl, SsrfBlockedError } from '../security/ssrf.js'
@@ -90,6 +90,9 @@ const updateToolSchema = z.object({
   // Argument name -> description, for path/query/header parameters and top-level body fields.
   parameterDescriptions: z.record(z.string(), z.string().max(1000))
     .refine(d => Object.keys(d).length <= 200, 'Too many parameters').optional(),
+  // Fields kept in successful responses sent to AI clients; null or [] sends the full response.
+  responseFields: z.array(z.string().refine(isValidFieldPath, 'Field paths are dot-separated JSON keys, e.g. "items.title"'))
+    .max(MAX_RESPONSE_FIELDS).nullable().optional(),
 }).strict()
 
 const createTokenSchema = z.object({
@@ -400,6 +403,7 @@ router.patch('/apps/:id/tools/:toolId', asyncHandler(async (req, res) => {
       fields.requestBodySchema = { ...tool.requestBodySchema, properties }
     }
   }
+  if (patch.responseFields) patch.responseFields = [...new Set(patch.responseFields)]
   if (!(await toolRepo.updateInApp(app.id, req.params.toolId, { ...patch, ...fields }))) throw new HttpError(404, 'Tool not found')
   res.json({ ok: true })
 }))
