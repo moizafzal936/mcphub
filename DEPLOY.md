@@ -277,15 +277,15 @@ Then use `root@SERVER_IP` wherever this guide says `ubuntu@SERVER_IP`.
 
 ## What has and hasn't been tested
 
+- Deployed end to end with this guide on Oracle Cloud Always Free (Ampere A1, Ubuntu 24.04):
+  - the initialization script;
+  - the Docker build on ARM;
+  - Caddy obtaining a Let's Encrypt certificate for an `sslip.io` name, and the HTTP to HTTPS redirect;
+  - `create-operator`, closed sign-up and the backup cron job.
 - Tested on a Mac in production mode behind HTTPS (21 checks):
   - security headers, the built dashboard and fonts;
-  - closed sign-up and `create-operator`;
   - secure cookies and blocked cross-site requests;
   - a real API call and a real MCP client;
   - OAuth metadata and backups.
-- The lockfile includes Linux ARM builds of every native module, so the build should run on
-  Oracle's Ampere servers.
-- Not yet tested: building the Docker image, the Oracle initialization script, and Caddy
-  obtaining a real certificate. No Docker or Oracle account was available during development, so
-  your first deploy is the first run of those. Sections 3, 6 and 11 tell you how to check each
-  one.
+- Not yet tested on a real server: restoring a backup (section 9) and the update steps (section 10).
+  Take a backup before trying either.

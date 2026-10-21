@@ -141,7 +141,7 @@ export default function AppsPage() {
                 <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
                   <h3 className="font-semibold text-white">{app.name}</h3>
                   <span className="text-xs bg-gray-800 text-gray-400 px-2 py-0.5 rounded-full whitespace-nowrap">
-                    {app.toolCount ?? 0} tools
+                    {app.toolCount ?? 0} tool{app.toolCount === 1 ? '' : 's'}
                   </span>
                   <span className="flex items-center gap-1 text-xs text-green-400 bg-green-950/50 border border-green-900/50 px-2 py-0.5 rounded-full">
                     <span className="w-1 h-1 rounded-full bg-green-400" />

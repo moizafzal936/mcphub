@@ -25,8 +25,9 @@ Run one instance only: MCP sessions and rate-limit counters are in process memor
 
 ### First run / existing data
 
-- The first account registered becomes the operator. After that, sign-up is closed unless `MCPHUB_ALLOW_SIGNUP=true`.
-  Register before exposing the server.
+- In production the first (operator) account is created from the server shell:
+  `node packages/server/dist/cli/create-operator.js you@example.com`. Web sign-up can't create it unless
+  `MCPHUB_WEB_BOOTSTRAP=true`. After that, sign-up is closed unless `MCPHUB_ALLOW_SIGNUP=true`.
 - Apps created before authentication existed have no owner. The operator sees a "Claim apps" banner on the
   dashboard (or run `npm run assign-orphans -w packages/server -- you@example.com`).
 - Plaintext credentials from earlier versions are encrypted automatically at startup.
@@ -84,4 +85,4 @@ exposure and rotation, SSRF (internal targets, IPv4/IPv6 forms, DNS rebinding, r
 session isolation, revocation, expiry and connection caps over Streamable HTTP and SSE, the OAuth flow, rate limits,
 argument validation, log redaction/retention, ownerless-app claiming, hostile (self-referencing) specs, TOTP two-factor, operator password reset, config export/import, query-parameter credentials, AI-readiness scoring, response shaping, upstream OAuth client credentials, fixed headers/params, first-run operator setup, backups and the playground loop (against a local stand-in for the Claude API;
 real-model behaviour is not covered).
-Path-containment rules for tool paths have no dedicated test file yet; the Docker image has not been built in CI.
+Path-containment rules for tool paths have no dedicated test file yet; the Docker image is built by hand (it has been deployed on ARM), not in CI.
