@@ -51,3 +51,49 @@ test('body parameters are rejected on GET tools and duplicate names are rejected
   })
   assert.equal(dup.status, 400)
 })
+
+test('tools can be created from a pasted curl command', async () => {
+  const app = await createApp(user, fx, { apiKey: 'sk-curl-app-123456' })
+  const base = `http://127.0.0.1:${fx.upstreamPort}/v1`
+  const curl = `curl -X POST '${base}/items/123?notify=true&limit=5' \\
+    -H "Authorization: Bearer sk_live_PASTED_FROM_DOCS" \\
+    -H 'Content-Type: application/json' \\
+    -H 'X-Request-Source: docs' \\
+    -d '{"title": "Hello", "count": 2, "draft": false, "tags": ["a"]}'`
+  const res = await user.post(`/api/apps/${app.id}/tools/from-curl`, { curl })
+  assert.equal(res.status, 201, JSON.stringify(res.body))
+  const tool = res.body.tool
+  assert.equal(tool.method, 'POST')
+  assert.equal(tool.path, '/items/{item_id}')
+  assert.deepEqual(tool.parameters.map((p: any) => [p.name, p.in, p.schema.type]), [
+    ['item_id', 'path', 'string'], ['notify', 'query', 'string'], ['limit', 'query', 'integer'], ['X-Request-Source', 'header', 'string'],
+  ])
+  assert.deepEqual(res.body.skippedHeaders, ['Authorization'])
+  assert.deepEqual(Object.fromEntries(Object.entries(tool.requestBodySchema.properties).map(([k, v]: any) => [k, v.type])),
+    { title: 'string', count: 'integer', draft: 'boolean', tags: 'array' })
+  assert.ok(!JSON.stringify(res.body).includes('sk_live_PASTED_FROM_DOCS'), 'pasted credential stored in the tool')
+
+  const run = await user.post(`/api/apps/${app.id}/tools/${tool.id}/execute`, {
+    item_id: '9', notify: 'false', limit: 3, title: 'Hi', count: 1, draft: true, tags: ['x'],
+  })
+  assert.equal(run.body.statusCode, 200)
+  assert.equal(run.body.data.id, '9')
+  const hit = fx.upstreamHits.at(-1)!
+  assert.equal(hit.method, 'POST')
+  assert.equal(hit.url, '/v1/items/9?notify=false&limit=3')
+  assert.equal(hit.headers.authorization, 'Bearer sk-curl-app-123456')
+  assert.deepEqual(JSON.parse(hit.body), { title: 'Hi', count: 1, draft: true, tags: ['x'] })
+})
+
+test('curl commands for other hosts or outside the base path are rejected', async () => {
+  const app = await createApp(user, fx)
+  for (const curl of [
+    'curl https://evil.example/v1/items',
+    `curl http://127.0.0.1:${fx.upstreamPort}/admin/items`,
+    'wget https://example.com',
+    `curl -X POST http://127.0.0.1:${fx.upstreamPort}/v1/echo -d 'a=1&b=2'`,
+  ]) {
+    const res = await user.post(`/api/apps/${app.id}/tools/from-curl`, { curl })
+    assert.equal(res.status, 400, `${curl} -> ${res.status}`)
+  }
+})

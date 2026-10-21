@@ -3,8 +3,9 @@ import { z } from 'zod'
 import { appRepo, logRepo, newId, tokenRepo, toolRepo, userRepo } from '../storage/db.js'
 import { parseOpenApiSpec } from '../ingestion/openapi.js'
 import { runTool } from '../ingestion/runTool.js'
+import { toolFromCurl } from '../ingestion/curl.js'
 import {
-  MAX_TOOLS_PER_APP, isValidParamName, isValidToolName, pathPlaceholders, sanitizeParameters, validateToolPath,
+  MAX_TOOLS_PER_APP, ToolInputError, isValidParamName, isValidToolName, pathPlaceholders, sanitizeParameters, validateToolPath,
 } from '../ingestion/toolSchema.js'
 import { assertResolvesPublic, parseOutboundUrl, SsrfBlockedError } from '../security/ssrf.js'
 import { isValidCredentialHeader } from '../security/headers.js'
@@ -244,6 +245,27 @@ router.post('/apps/:id/tools', asyncHandler(async (req, res) => {
   }
   await toolRepo.insertMany([tool])
   res.status(201).json(tool)
+}))
+
+router.post('/apps/:id/tools/from-curl', asyncHandler(async (req, res) => {
+  const app = await ownedApp(req)
+  const input = z.object({
+    curl: z.string().min(4).max(20_000),
+    name: z.string().trim().refine(isValidToolName, 'Tool name must be 1-64 characters: letters, digits, "_" or "-"').optional(),
+    description: z.string().max(2000).optional(),
+  }).parse(req.body)
+  if ((await toolRepo.countByAppId(app.id)) >= MAX_TOOLS_PER_APP) throw new HttpError(400, `Apps are limited to ${MAX_TOOLS_PER_APP} tools`)
+  let built
+  try {
+    built = toolFromCurl(input.curl, app, { name: input.name, description: input.description })
+  } catch (err) {
+    if (err instanceof ToolInputError) throw new HttpError(400, err.message)
+    throw err
+  }
+  if (await toolRepo.findByNameInApp(app.id, built.tool.name)) throw new HttpError(409, `A tool named "${built.tool.name}" already exists`)
+  const tool: McpTool = { id: newId(), ...built.tool }
+  await toolRepo.insertMany([tool])
+  res.status(201).json({ tool, skippedHeaders: built.skippedHeaders, usedBasicAuth: built.usedBasicAuth })
 }))
 
 router.patch('/apps/:id/tools/:toolId', asyncHandler(async (req, res) => {

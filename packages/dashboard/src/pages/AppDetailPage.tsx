@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, RefreshCw, Zap, ToggleLeft, ToggleRight,
   Clock, CheckCircle, XCircle, Activity, Terminal, List, Radio,
-  Plus, Trash2, X, Settings, Sparkles
+  Plus, Trash2, X, Settings, Sparkles, TerminalSquare
 } from 'lucide-react'
 import { api, apiError, type App, type McpTool, type ToolCallLog } from '../lib/api.ts'
 import { useToast } from '../components/Toast.tsx'
@@ -11,6 +11,7 @@ import { ToolTester } from '../components/ToolTester.tsx'
 import { ConnectPanel } from '../components/ConnectPanel.tsx'
 import { SettingsPanel } from '../components/SettingsPanel.tsx'
 import { PlaygroundPanel } from '../components/PlaygroundPanel.tsx'
+import { CurlImportModal } from '../components/CurlImportModal.tsx'
 
 type Tab = 'connect' | 'tools' | 'test' | 'playground' | 'logs' | 'settings'
 
@@ -304,6 +305,7 @@ export default function AppDetailPage() {
   const [liveLogs, setLiveLogs] = useState(false)
   const [showAddTool, setShowAddTool] = useState(false)
   const [errorsOnly, setErrorsOnly] = useState(false)
+  const [showCurl, setShowCurl] = useState(false)
   const logPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const fetchLogs = useCallback(async () => {
@@ -459,6 +461,7 @@ export default function AppDetailPage() {
         </div>
       )}
 
+      {showCurl && <CurlImportModal app={app} onClose={() => setShowCurl(false)} onAdded={tool => setTools(ts => [...ts, tool])} />}
       {tab === 'settings' && <SettingsPanel app={app} onUpdated={setApp} />}
       {tab === 'playground' && <PlaygroundPanel app={app} />}
 
@@ -467,13 +470,22 @@ export default function AppDetailPage() {
         <div>
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs text-gray-600">{tools.length} tools</p>
-            <button
-              onClick={() => setShowAddTool(true)}
-              className="flex items-center gap-1.5 text-xs bg-brand-950 hover:bg-brand-900 border border-brand-800 text-brand-300 px-3 py-1.5 rounded-lg transition-colors"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Add Tool
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowCurl(true)}
+                className="flex items-center gap-1.5 text-xs border border-gray-700 hover:border-gray-600 text-gray-300 px-3 py-1.5 rounded-lg transition-colors"
+              >
+                <TerminalSquare className="w-3.5 h-3.5" />
+                From curl
+              </button>
+              <button
+                onClick={() => setShowAddTool(true)}
+                className="flex items-center gap-1.5 text-xs bg-brand-950 hover:bg-brand-900 border border-brand-800 text-brand-300 px-3 py-1.5 rounded-lg transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Add Tool
+              </button>
+            </div>
           </div>
           <div className="space-y-1.5">
             {tools.length === 0 && (

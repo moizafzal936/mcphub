@@ -154,6 +154,8 @@ export const api = {
       path: string
       queryParams?: { name: string; description: string; required: boolean; in?: 'query' | 'header' | 'body'; type?: string }[]
     }) => http.post<McpTool>(`/apps/${appId}/tools`, data).then(r => r.data),
+    fromCurl: (appId: string, curl: string, name?: string) =>
+      http.post<{ tool: McpTool; skippedHeaders: string[]; usedBasicAuth: boolean }>(`/apps/${appId}/tools/from-curl`, { curl, ...(name ? { name } : {}) }).then(r => r.data),
     toggle: (appId: string, toolId: string, enabled: boolean) =>
       http.patch(`/apps/${appId}/tools/${toolId}`, { enabled }).then(r => r.data),
     updateMeta: (appId: string, toolId: string, data: { name?: string; description?: string }) =>
