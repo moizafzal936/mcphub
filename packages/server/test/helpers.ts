@@ -69,6 +69,10 @@ export async function startFixtures(): Promise<Fixtures> {
         return redirect(`http://127.0.0.1:${internalPort}/secret`)
       case url.pathname === '/v1/redirect-cross':
         return redirect(`http://localhost:${upstreamPort}/v1/echo`)
+      case url.pathname === '/v1/many':
+        return json(200, Array.from({ length: 2000 }, (_, i) => ({ id: i, name: `item-${i}`, note: 'x'.repeat(60) })))
+      case url.pathname === '/v1/wrapped':
+        return json(200, { total: 2000, results: Array.from({ length: 2000 }, (_, i) => ({ id: i, note: 'y'.repeat(60) })) })
       case url.pathname === '/v1/big':
         res.writeHead(200, { 'content-type': 'application/json' })
         return res.end(JSON.stringify({ blob: 'x'.repeat(6_000_000) }))

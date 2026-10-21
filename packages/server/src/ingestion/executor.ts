@@ -4,7 +4,8 @@ import { isReservedHeader, isValidHeaderValue } from '../security/headers.js'
 import { redactString } from '../security/redact.js'
 import { ToolInputError, buildUpstreamUrl, validateToolArgs } from './toolSchema.js'
 
-const MAX_RESPONSE_TEXT = 500_000
+// What AI clients receive. Big API responses would otherwise flood the model's context window.
+const MAX_MODEL_CHARS = Number(process.env.MCPHUB_MAX_TOOL_RESPONSE_CHARS) || 40_000
 const MAX_UPSTREAM_RESPONSE_BYTES = 5_000_000
 const MAX_UPSTREAM_REQUEST_BYTES = 256 * 1024
 const UPSTREAM_TIMEOUT_MS = 15_000
@@ -18,8 +19,52 @@ export interface ExecResult {
   error?: string
 }
 
-function truncate(text: string): string {
-  return text.length > MAX_RESPONSE_TEXT ? text.slice(0, MAX_RESPONSE_TEXT) + '\n[truncated]' : text
+function fitArray(items: unknown[], budget: number): { kept: unknown[]; omitted: number } {
+  const kept: unknown[] = []
+  let used = 2
+  for (const item of items) {
+    const size = JSON.stringify(item, null, 2).length + 4
+    if (used + size > budget && kept.length > 0) break
+    kept.push(item)
+    used += size
+  }
+  return { kept, omitted: items.length - kept.length }
+}
+
+/**
+ * Formats a response for an AI client within MAX_MODEL_CHARS. Long lists (top level, or the
+ * largest list one level down, e.g. {"results": [...]}) keep whole items and say how many were
+ * left out, so the model can narrow its request instead of reading a cut-off fragment.
+ */
+export function formatForModel(data: unknown, maxChars = MAX_MODEL_CHARS): string {
+  const full = typeof data === 'string' ? data : JSON.stringify(data, null, 2) ?? ''
+  if (full.length <= maxChars) return full
+  const note = (shown: number, total: number) =>
+    `\n[Showing ${shown} of ${total} items to keep the response small. Use filters, paging or limit parameters to get specific items.]`
+
+  // Estimate with fitArray, then drop items until the exact rendering (with nesting indentation) fits.
+  const shrink = (list: unknown[], render: (kept: unknown[]) => string): string | undefined => {
+    let { kept } = fitArray(list, maxChars)
+    let out = render(kept)
+    while (out.length > maxChars && kept.length > 1) {
+      kept = kept.slice(0, Math.max(1, Math.floor(kept.length * 0.9)))
+      out = render(kept)
+    }
+    return kept.length < list.length && out.length <= maxChars ? out : undefined
+  }
+
+  if (Array.isArray(data)) {
+    const out = shrink(data, kept => JSON.stringify(kept, null, 2) + note(kept.length, data.length))
+    if (out) return out
+  } else if (data && typeof data === 'object') {
+    const entries = Object.entries(data as Record<string, unknown>)
+    const [key, list] = entries.filter(([, v]) => Array.isArray(v)).sort((a, b) => (b[1] as unknown[]).length - (a[1] as unknown[]).length)[0] ?? []
+    if (key && Array.isArray(list)) {
+      const out = shrink(list, kept => JSON.stringify({ ...(data as object), [key]: kept }, null, 2) + note(kept.length, list.length))
+      if (out) return out
+    }
+  }
+  return full.slice(0, maxChars) + `\n[Response cut at ${maxChars} of ${full.length} characters. Request less data to see the rest.]`
 }
 
 function failure(start: number, message: string): ExecResult {
@@ -102,8 +147,7 @@ export async function executeTool(
     try {
       parsed = JSON.parse(scrubbed)
     } catch {}
-    const text = typeof parsed === 'string' ? parsed : JSON.stringify(parsed, null, 2)
-    return { data: parsed, statusCode: response.status, durationMs: Date.now() - start, text: truncate(text) }
+    return { data: parsed, statusCode: response.status, durationMs: Date.now() - start, text: formatForModel(parsed) }
   } catch (err: any) {
     if (err instanceof SsrfBlockedError || err?.cause instanceof SsrfBlockedError || err?.code === 'SSRF_BLOCKED') {
       return failure(start, 'Request blocked: destination is not a public address')

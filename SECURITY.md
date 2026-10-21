@@ -74,7 +74,7 @@ one transaction (nothing changes if any check fails). Then switch `MCPHUB_ENCRYP
 
 ## Tests
 
-`npm test -w packages/server` (61 tests) covers authentication, cross-tenant authorization, CSRF, credential storage,
+`npm test -w packages/server` (63 tests) covers authentication, cross-tenant authorization, CSRF, credential storage,
 exposure and rotation, SSRF (internal targets, IPv4/IPv6 forms, DNS rebinding, redirects, proxy env), MCP token and
 session isolation, revocation, expiry and connection caps over Streamable HTTP and SSE, the OAuth flow, rate limits,
 argument validation, log redaction/retention, ownerless-app claiming, hostile (self-referencing) specs, TOTP two-factor, operator password reset and the playground loop (against a local stand-in for the Claude API;

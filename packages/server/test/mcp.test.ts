@@ -230,3 +230,25 @@ test('read-only mode hides and blocks write tools for AI clients', async () => {
   assert.equal(allowed.isError, false)
   await client.close()
 })
+
+test('large responses are trimmed to whole items for AI clients, with a note', async () => {
+  const app = await createApp(alice, fx)
+  await addTool(alice, app.id, { name: 'many', path: '/many' })
+  await addTool(alice, app.id, { name: 'wrapped', path: '/wrapped' })
+  const { token } = await mintToken(alice, app.id)
+  const client = await connectHttp(app.id, token)
+
+  const many: any = await client.callTool({ name: 'many', arguments: {} })
+  const text: string = many.content[0].text
+  assert.ok(text.length <= 40_500, `response is ${text.length} chars`)
+  const shown = Number(text.match(/Showing (\d+) of 2000 items/)![1])
+  assert.ok(shown > 50 && shown < 2000)
+  assert.equal(JSON.parse(text.slice(0, text.indexOf('\n[Showing'))).length, shown, 'trimmed JSON is not valid')
+
+  const wrapped: any = await client.callTool({ name: 'wrapped', arguments: {} })
+  const wText: string = wrapped.content[0].text
+  const body = JSON.parse(wText.slice(0, wText.indexOf('\n[Showing')))
+  assert.equal(body.total, 2000)
+  assert.ok(body.results.length > 50 && body.results.length < 2000)
+  await client.close()
+})
