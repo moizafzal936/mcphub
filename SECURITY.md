@@ -43,6 +43,7 @@ Run one instance only: MCP sessions and rate-limit counters are in process memor
 | SSRF | Destination IPs validated at connect time inside the HTTP agent (covers DNS rebinding, redirects and IP literals). Only globally routable unicast addresses are allowed; private, loopback, link-local, CGNAT, metadata, NAT64/6to4/Teredo and IPv4-mapped forms are blocked. Proxy env vars are ignored. Applies to tool calls and OpenAPI imports. |
 | Request shaping | Upstream URL must stay on the base origin and under the base path. Tool arguments are validated against the tool's JSON Schema (Ajv). Header names/values validated; transport, proxy and credential headers can't be overridden. Size limits on bodies, arguments, specs and responses. Tool calls follow redirects only within the same origin. |
 | Config export/import | Exported `.mcphub.json` files hold the app's settings and tools only — never the upstream key, ids, tokens or logs. Imports create a new app owned by the importer and re-run every check (base/spec URL policy, credential header, tool names, path containment, reserved headers, body fields). |
+| Fixed headers / query params | Per-app values sent on every call (API versions, a second credential). Names can't be transport, proxy or credential headers; tool parameters with the same name are hidden from AI clients, which can't override them. Values marked secret are AES-256-GCM encrypted (bound to app + name), never returned by the API or exported, redacted like the key, and covered by key rotation. |
 | Read-only mode | Per-app switch: AI clients (MCP and playground) see only GET tools; write calls are refused server-side. |
 | Abuse | Rate limits per app, per client, per IP for auth, plus caps on concurrent SSE connections. |
 | Playground | Optional (`ANTHROPIC_API_KEY` on the server). Runs a Claude tool-use loop for the app owner; tool calls go through the same validated, SSRF-guarded, rate-limited, logged path as MCP. The upstream credential is never sent to the model. |
@@ -75,9 +76,9 @@ one transaction (nothing changes if any check fails). Then switch `MCPHUB_ENCRYP
 
 ## Tests
 
-`npm test -w packages/server` (91 tests) covers authentication, cross-tenant authorization, CSRF, credential storage,
+`npm test -w packages/server` (96 tests) covers authentication, cross-tenant authorization, CSRF, credential storage,
 exposure and rotation, SSRF (internal targets, IPv4/IPv6 forms, DNS rebinding, redirects, proxy env), MCP token and
 session isolation, revocation, expiry and connection caps over Streamable HTTP and SSE, the OAuth flow, rate limits,
-argument validation, log redaction/retention, ownerless-app claiming, hostile (self-referencing) specs, TOTP two-factor, operator password reset, config export/import, query-parameter credentials, AI-readiness scoring, response shaping, upstream OAuth client credentials and the playground loop (against a local stand-in for the Claude API;
+argument validation, log redaction/retention, ownerless-app claiming, hostile (self-referencing) specs, TOTP two-factor, operator password reset, config export/import, query-parameter credentials, AI-readiness scoring, response shaping, upstream OAuth client credentials, fixed headers/params and the playground loop (against a local stand-in for the Claude API;
 real-model behaviour is not covered).
 Path-containment rules for tool paths have no dedicated test file yet; the Docker image has not been built in CI.

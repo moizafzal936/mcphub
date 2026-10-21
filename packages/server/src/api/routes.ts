@@ -14,12 +14,13 @@ import {
 } from '../ingestion/toolSchema.js'
 import { assertResolvesPublic, parseOutboundUrl, SsrfBlockedError } from '../security/ssrf.js'
 import { asyncHandler, HttpError } from '../http/errors.js'
+import { isReservedHeader, isValidHeaderName, isValidHeaderValue } from '../security/headers.js'
 import { issueMcpToken, requireUser } from '../auth/auth.js'
 import { closeSessions } from '../mcp-host/server.js'
 import { listGrants, revokeGrantInApp } from '../auth/oauth.js'
 import { playgroundEnabled, runPlayground } from '../playground.js'
 import { getConfig } from '../config.js'
-import type { App, McpTool } from '../types/index.js'
+import type { App, FixedParam, McpTool } from '../types/index.js'
 
 const router = Router()
 router.use(requireUser)
@@ -67,6 +68,45 @@ const oauthConfigSchema = z.object({
 }).strict()
 const authTypeSchema = z.enum(['api_key', 'oauth2_client_credentials'])
 
+const MAX_FIXED_PARAMS = 20
+const fixedParamsSchema = z.array(z.object({
+  in: z.enum(['header', 'query']),
+  name: z.string().trim().min(1).max(128),
+  // Omitted or null for a secret keeps the stored value.
+  value: z.string().max(4096).nullable().optional(),
+  secret: z.boolean().optional().default(false),
+}).strict()).max(MAX_FIXED_PARAMS, `Up to ${MAX_FIXED_PARAMS} fixed parameters`)
+type FixedParamInput = z.infer<typeof fixedParamsSchema>[number]
+
+/**
+ * Fixed params must be valid, unique and must not collide with transport headers or with the
+ * app's own credential. `existing` is the current public view, to know which secrets are stored.
+ */
+function checkFixedParams(
+  params: Pick<FixedParamInput, 'in' | 'name' | 'secret' | 'value'>[],
+  auth: Pick<App, 'apiKeyIn' | 'apiKeyHeader'>,
+  existing: FixedParam[] = [],
+  opts: { allowMissingSecrets?: boolean } = {}
+): void {
+  const seen = new Set<string>()
+  for (const p of params) {
+    const key = `${p.in}:${p.in === 'header' ? p.name.toLowerCase() : p.name}`
+    if (seen.has(key)) throw new HttpError(400, `"${p.name}" is listed twice`)
+    seen.add(key)
+    const credential = auth.apiKeyIn === p.in && auth.apiKeyHeader.toLowerCase() === p.name.toLowerCase()
+    if (p.in === 'header') {
+      if (!isValidHeaderName(p.name) || isReservedHeader(p.name, auth.apiKeyIn === 'header' ? auth.apiKeyHeader : undefined) || credential) {
+        throw new HttpError(400, `"${p.name}" can't be a fixed header (invalid, reserved, or used for the app's credential)`)
+      }
+      if (p.value && !isValidHeaderValue(p.value)) throw new HttpError(400, `The value of "${p.name}" contains characters not allowed in a header`)
+    } else if (!isValidParamName(p.name) || credential) {
+      throw new HttpError(400, `"${p.name}" can't be a fixed query parameter (invalid, or used for the app's credential)`)
+    }
+    const stored = existing.some(e => e.secret && e.hasValue && e.in === p.in && e.name === p.name)
+    if (!p.value && !(p.secret && (stored || opts.allowMissingSecrets))) throw new HttpError(400, `Enter a value for "${p.name}"`)
+  }
+}
+
 /**
  * Resolves how the app authenticates upstream. With OAuth client credentials the stored secret is
  * the client secret and tokens always go in "Authorization: Bearer"; the token URL must be public.
@@ -104,6 +144,7 @@ const updateAppSchema = z.object({
   apiKeyIn: credentialInSchema.optional(),
   authType: authTypeSchema.optional(),
   oauth: oauthConfigSchema.optional(),
+  fixedParams: fixedParamsSchema.optional(),
   rateLimitPerMin: rateLimitSchema.optional(),
   readOnly: z.boolean().optional(),
 }).strict()
@@ -219,6 +260,7 @@ router.post('/apps', asyncHandler(async (req, res) => {
     specUrl: input.specUrl,
     ...credential,
     ...(oauth ? { oauth } : {}),
+    fixedParams: [],
     hasApiKey: !!input.apiKey,
     rateLimitPerMin: input.rateLimitPerMin,
     readOnly: false,
@@ -240,7 +282,7 @@ router.post('/apps', asyncHandler(async (req, res) => {
 
 router.patch('/apps/:id', asyncHandler(async (req, res) => {
   const app = await ownedApp(req)
-  const { oauth: oauthPatch, ...patch } = updateAppSchema.parse(req.body)
+  const { oauth: oauthPatch, fixedParams, ...patch } = updateAppSchema.parse(req.body)
   let auth: Awaited<ReturnType<typeof authSetting>> | undefined
   if (patch.authType !== undefined || oauthPatch !== undefined || patch.apiKeyIn !== undefined || patch.apiKeyHeader !== undefined) {
     const authType = patch.authType ?? app.authType
@@ -250,7 +292,12 @@ router.patch('/apps/:id', asyncHandler(async (req, res) => {
     const apiKeyHeader = patch.apiKeyHeader ?? (keepLocation && (!patch.apiKeyIn || patch.apiKeyIn === app.apiKeyIn) ? app.apiKeyHeader : undefined)
     auth = await authSetting(authType, oauthPatch ?? app.oauth, apiKeyIn, apiKeyHeader)
   }
+  // Fixed params are checked against the credential setup the app will have after this change.
+  const finalAuth = { apiKeyIn: auth?.apiKeyIn ?? app.apiKeyIn, apiKeyHeader: auth?.apiKeyHeader ?? app.apiKeyHeader }
+  if (fixedParams) checkFixedParams(fixedParams, finalAuth, app.fixedParams)
+  else if (auth) checkFixedParams(app.fixedParams.map(f => ({ ...f, value: f.value ?? null })), finalAuth, app.fixedParams)
   await appRepo.update(app.id, req.user!.id, { ...patch, ...auth })
+  if (fixedParams) await appRepo.setFixedParams(app.id, req.user!.id, fixedParams)
   forgetAccessToken(app.id)
   const updated = (await appRepo.findForOwner(app.id, req.user!.id))!
   res.json(publicApp(updated))
@@ -314,6 +361,7 @@ router.post('/apps/import-config', express.text({ type: () => true, limit: '5mb'
   }
   let config, settings, specUrl: string | undefined
   let oauthConfig: App['oauth'] | undefined
+  let importedFixed: FixedParamInput[] = []
   try {
     config = appConfigSchema.parse(doc)
     settings = createAppSchema.pick({ name: true, baseUrl: true, rateLimitPerMin: true }).parse({
@@ -322,6 +370,7 @@ router.post('/apps/import-config', express.text({ type: () => true, limit: '5mb'
       rateLimitPerMin: config.app.rateLimitPerMin ?? null,
     })
     if (config.app.oauth !== undefined) oauthConfig = oauthConfigSchema.parse(config.app.oauth)
+    if (config.app.fixedParams !== undefined) importedFixed = fixedParamsSchema.parse(config.app.fixedParams)
     specUrl = config.app.specUrl ? z.string().trim().url().max(2048).parse(config.app.specUrl) : undefined
     if (specUrl) parseOutboundUrl(specUrl)
   } catch (err: any) {
@@ -333,6 +382,8 @@ router.post('/apps/import-config', express.text({ type: () => true, limit: '5mb'
   let credential
   try {
     credential = await authSetting(config.app.authType ?? 'api_key', oauthConfig, config.app.apiKeyIn, config.app.apiKeyHeader)
+    // Exports never contain secret values, so imported secrets arrive empty and are filled in Settings.
+    checkFixedParams(importedFixed.map(f => (f.secret ? { ...f, value: null } : f)), credential, [], { allowMissingSecrets: true })
   } catch (err) {
     if (err instanceof HttpError) throw new HttpError(422, `Import failed: ${err.message}`)
     throw err
@@ -349,6 +400,7 @@ router.post('/apps/import-config', express.text({ type: () => true, limit: '5mb'
     specUrl,
     ...location,
     ...(oauth ? { oauth } : {}),
+    fixedParams: [],
     hasApiKey: false,
     rateLimitPerMin: settings.rateLimitPerMin,
     readOnly: config.app.readOnly ?? false,
@@ -363,8 +415,10 @@ router.post('/apps/import-config', express.text({ type: () => true, limit: '5mb'
     throw err
   }
   await appRepo.insert(app, undefined)
+  if (importedFixed.length) await appRepo.setFixedParams(app.id, app.ownerId, importedFixed.map(f => (f.secret ? { ...f, value: null } : f)))
   await toolRepo.insertMany(built.tools)
-  res.status(201).json({ ...publicApp(app), toolCount: built.tools.length, skipped: built.skipped })
+  const created = (await appRepo.findForOwner(app.id, req.user!.id))!
+  res.status(201).json({ ...publicApp(created), toolCount: built.tools.length, skipped: built.skipped })
 }))
 
 // Fetches a token with the stored client credentials, to check the OAuth setup. Never returns the token.

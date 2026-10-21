@@ -4,6 +4,7 @@ import { Copy, Download, Eye, KeyRound, Loader2, ShieldCheck, Trash2 } from 'luc
 import { api, apiError, type App } from '../lib/api.ts'
 import { useToast } from './Toast.tsx'
 import { OAuthFields, fromOAuthForm, toOAuthForm } from './OAuthFields.tsx'
+import { FixedParamsCard } from './FixedParamsCard.tsx'
 
 const inputCls = 'w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-brand-500'
 
@@ -251,6 +252,8 @@ export function SettingsPanel({ app, onUpdated }: { app: App; onUpdated: (app: A
           </button>
         )}
       </div>
+
+      <FixedParamsCard app={app} onUpdated={onUpdated} inputClass={inputCls} />
 
       <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-3">
         <h2 className="font-semibold text-white">Export &amp; duplicate</h2>

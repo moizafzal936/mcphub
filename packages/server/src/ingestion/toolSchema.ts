@@ -34,14 +34,15 @@ export function isValidCredentialName(where: App['apiKeyIn'], name: string): boo
 }
 
 /**
- * The tool as callers and AI clients see it. When the app sends its key as a query parameter,
- * a parameter with that name (specs often declare one) is hidden, so the model can neither
- * read nor override the credential.
+ * The tool as callers and AI clients see it. Parameters the app sets itself are hidden, so the
+ * model can neither read nor override them: a query-parameter credential (specs often declare
+ * one) and the app's fixed headers and query parameters.
  */
-export function toolForApp(app: Pick<App, 'apiKeyHeader' | 'apiKeyIn'>, tool: McpTool): McpTool {
-  if (app.apiKeyIn !== 'query') return tool
-  const credential = app.apiKeyHeader.toLowerCase()
-  const parameters = tool.parameters.filter(p => !(p.in === 'query' && p.name.toLowerCase() === credential))
+export function toolForApp(app: Pick<App, 'apiKeyHeader' | 'apiKeyIn'> & { fixedParams?: App['fixedParams'] }, tool: McpTool): McpTool {
+  const hidden = new Set((app.fixedParams ?? []).map(f => `${f.in}:${f.name.toLowerCase()}`))
+  if (app.apiKeyIn === 'query') hidden.add(`query:${app.apiKeyHeader.toLowerCase()}`)
+  if (!hidden.size) return tool
+  const parameters = tool.parameters.filter(p => !hidden.has(`${p.in}:${p.name.toLowerCase()}`))
   return parameters.length === tool.parameters.length ? tool : { ...tool, parameters }
 }
 

@@ -59,6 +59,10 @@ export function decryptSecret(stored: string, context: string, withKey: Buffer =
   return Buffer.concat([decipher.update(Buffer.from(ctB64, 'base64url')), decipher.final()]).toString('utf8')
 }
 
+export function fixedParamContext(appId: string, where: string, name: string): string {
+  return `app-fixed:${appId}:${where}:${name}`
+}
+
 export function appSecretContext(appId: string): string {
   return `app-api-key:${appId}`
 }

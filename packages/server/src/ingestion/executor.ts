@@ -84,10 +84,11 @@ export async function executeTool(
   app: App,
   apiKey: string | undefined,
   appTool: McpTool,
-  rawArgs: unknown
+  rawArgs: unknown,
+  fixed: { in: 'header' | 'query'; name: string; secret: boolean; value: string }[] = []
 ): Promise<ExecResult> {
   const start = Date.now()
-  const secrets = secretForms(apiKey)
+  const secrets = [...secretForms(apiKey), ...fixed.filter(f => f.secret).flatMap(f => secretForms(f.value))]
   const tool = toolForApp(app, appTool)
 
   let args: Record<string, unknown>
@@ -116,6 +117,16 @@ export async function executeTool(
       headers[param.name] = text
     } else {
       queryParams[param.name] = String(value)
+    }
+  }
+
+  // Fixed params are set by the owner and win over anything the caller sent.
+  for (const f of fixed) {
+    if (f.in === 'header') {
+      if (!isValidHeaderValue(f.value)) return failure(start, `Fixed header "${f.name}" has a value that cannot be sent`)
+      headers[f.name] = f.value
+    } else {
+      queryParams[f.name] = f.value
     }
   }
 
@@ -156,10 +167,12 @@ export async function executeTool(
   }
 
   const shown = new URL(url)
+  const hiddenInPreview = new Set(fixed.filter(f => f.secret && f.in === 'query').map(f => f.name))
+  if (apiKey && app.apiKeyIn === 'query' && !oauth) hiddenInPreview.add(app.apiKeyHeader)
   for (const [k, v] of Object.entries(queryParams)) {
-    shown.searchParams.set(k, apiKey && app.apiKeyIn === 'query' && k === app.apiKeyHeader ? '[REDACTED]' : v)
+    shown.searchParams.set(k, hiddenInPreview.has(k) ? '[REDACTED]' : v)
   }
-  const request = { method: tool.method, url: shown.toString().replace('%5BREDACTED%5D', '[REDACTED]') }
+  const request = { method: tool.method, url: shown.toString().replaceAll('%5BREDACTED%5D', '[REDACTED]') }
 
   const send = () => safeRequest({
     method: tool.method,

@@ -26,8 +26,16 @@ export async function runTool(app: App, tool: McpTool, args: unknown, clientKey:
     return { data: { error: message }, statusCode: 0, durationMs: Date.now() - start, text: `Error: ${message}`, error: message }
   }
 
-  const result = await executeTool(app, apiKey, tool, args)
-  const secrets = secretForms(apiKey)
+  let fixed: Awaited<ReturnType<typeof appRepo.getFixedParams>> = []
+  try {
+    fixed = await appRepo.getFixedParams(app.id)
+  } catch {
+    const message = 'A stored fixed parameter could not be decrypted (check MCPHUB_ENCRYPTION_KEY)'
+    return { data: { error: message }, statusCode: 0, durationMs: Date.now() - start, text: `Error: ${message}`, error: message }
+  }
+
+  const result = await executeTool(app, apiKey, tool, args, fixed)
+  const secrets = [...secretForms(apiKey), ...fixed.filter(f => f.secret).flatMap(f => secretForms(f.value))]
   await logRepo.insert({
     id: newId(),
     appId: app.id,

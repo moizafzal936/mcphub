@@ -24,6 +24,7 @@ export interface AppConfig {
     apiKeyIn: App['apiKeyIn']
     authType: App['authType']
     oauth?: App['oauth']
+    fixedParams?: { in: 'header' | 'query'; name: string; secret: boolean; value?: string }[]
     rateLimitPerMin: number | null
     readOnly: boolean
   }
@@ -43,6 +44,8 @@ export function exportAppConfig(app: App, tools: McpTool[]): AppConfig {
       apiKeyIn: app.apiKeyIn,
       authType: app.authType,
       ...(app.oauth ? { oauth: app.oauth } : {}),
+      // Secret values never leave the server; the importer re-enters them.
+      ...(app.fixedParams.length ? { fixedParams: app.fixedParams.map(f => (f.secret ? { in: f.in, name: f.name, secret: true } : { in: f.in, name: f.name, secret: false, value: f.value ?? '' })) } : {}),
       rateLimitPerMin: app.rateLimitPerMin,
       readOnly: app.readOnly,
     },
@@ -72,6 +75,7 @@ export const appConfigSchema = z.object({
     apiKeyIn: z.enum(['header', 'query']).optional(),
     authType: z.enum(['api_key', 'oauth2_client_credentials']).optional(),
     oauth: z.unknown().optional(),
+    fixedParams: z.unknown().optional(),
     rateLimitPerMin: z.number().nullable().optional(),
     readOnly: z.boolean().optional(),
   }),

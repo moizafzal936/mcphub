@@ -7,6 +7,16 @@ export interface OAuthClientConfig {
   clientAuth: 'basic' | 'post'
 }
 
+/** A header or query parameter sent on every call (API version, tenant id, a second credential). */
+export interface FixedParam {
+  in: 'header' | 'query'
+  name: string
+  secret: boolean
+  /** Omitted for secret params outside the storage layer; `hasValue` says whether one is stored. */
+  value?: string
+  hasValue?: boolean
+}
+
 export interface App {
   id: string
   ownerId: string | null
@@ -19,6 +29,7 @@ export interface App {
   /** api_key: the stored secret is sent as-is. oauth2_client_credentials: it is the client secret used to fetch tokens. */
   authType: 'api_key' | 'oauth2_client_credentials'
   oauth?: OAuthClientConfig
+  fixedParams: FixedParam[]
   hasApiKey: boolean
   rateLimitPerMin: number | null
   readOnly: boolean

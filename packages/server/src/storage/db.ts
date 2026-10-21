@@ -3,8 +3,8 @@ import { dirname } from 'path'
 import { mkdirSync } from 'fs'
 import { nanoid } from 'nanoid'
 import { getConfig } from '../config.js'
-import type { App, McpTool, McpToken, ToolCallLog, User } from '../types/index.js'
-import { appSecretContext, decryptSecret, encryptSecret, isEncrypted } from '../security/secrets.js'
+import type { App, FixedParam, McpTool, McpToken, ToolCallLog, User } from '../types/index.js'
+import { appSecretContext, decryptSecret, encryptSecret, fixedParamContext, isEncrypted } from '../security/secrets.js'
 
 let client: Client | undefined
 
@@ -153,6 +153,7 @@ export async function migrate(): Promise<{ encryptedLegacySecrets: number; orpha
   if (!appCols.has('read_only')) await db.execute('ALTER TABLE apps ADD COLUMN read_only INTEGER NOT NULL DEFAULT 0')
   const toolCols = await columns('mcp_tools')
   if (!toolCols.has('response_fields')) await db.execute('ALTER TABLE mcp_tools ADD COLUMN response_fields TEXT')
+  if (!appCols.has('fixed_params')) await db.execute('ALTER TABLE apps ADD COLUMN fixed_params TEXT')
   if (!appCols.has('auth_type')) await db.execute("ALTER TABLE apps ADD COLUMN auth_type TEXT NOT NULL DEFAULT 'api_key'")
   if (!appCols.has('oauth_config')) await db.execute('ALTER TABLE apps ADD COLUMN oauth_config TEXT')
   if (!appCols.has('api_key_in')) await db.execute("ALTER TABLE apps ADD COLUMN api_key_in TEXT NOT NULL DEFAULT 'header'")
@@ -277,6 +278,15 @@ export const sessionRepo = {
 
 // ── Apps ───────────────────────────────────────────────────────────────────────
 
+function storedFixedParams(row: any): FixedParam[] {
+  return row.fixed_params ? JSON.parse(String(row.fixed_params)) : []
+}
+
+/** Public view: secret values are never returned, only whether one is stored. */
+function publicFixedParams(stored: FixedParam[]): FixedParam[] {
+  return stored.map(p => (p.secret ? { in: p.in, name: p.name, secret: true, hasValue: !!p.value } : { in: p.in, name: p.name, secret: false, value: p.value ?? '' }))
+}
+
 function rowToApp(row: any): App {
   return {
     id: String(row.id),
@@ -288,6 +298,7 @@ function rowToApp(row: any): App {
     apiKeyIn: row.api_key_in === 'query' ? 'query' : 'header',
     authType: row.auth_type === 'oauth2_client_credentials' ? 'oauth2_client_credentials' : 'api_key',
     ...(row.oauth_config ? { oauth: JSON.parse(String(row.oauth_config)) } : {}),
+    fixedParams: publicFixedParams(storedFixedParams(row)),
     hasApiKey: row.api_key != null && String(row.api_key) !== '',
     rateLimitPerMin: row.rate_limit_per_min == null ? null : Number(row.rate_limit_per_min),
     readOnly: Number(row.read_only ?? 0) === 1,
@@ -343,6 +354,33 @@ export const appRepo = {
   },
 
   /** Decrypts the app's upstream credential. Only the executor should call this. */
+  /** Fixed params with secret values decrypted, for building outbound requests only. */
+  async getFixedParams(appId: string): Promise<Required<Pick<FixedParam, 'in' | 'name' | 'secret' | 'value'>>[]> {
+    const res = await getDb().execute({ sql: 'SELECT fixed_params FROM apps WHERE id = ?', args: [appId] })
+    return storedFixedParams(res.rows[0] ?? {})
+      .filter(p => p.value)
+      .map(p => ({ in: p.in, name: p.name, secret: p.secret, value: p.secret ? decryptSecret(p.value!, fixedParamContext(appId, p.in, p.name)) : p.value! }))
+  },
+
+  /**
+   * Replaces the app's fixed params. A secret given without a value keeps the stored value of the
+   * same param; new secret values are encrypted, bound to the app and param name.
+   */
+  async setFixedParams(appId: string, ownerId: string | null, params: { in: FixedParam['in']; name: string; secret: boolean; value?: string | null }[]): Promise<void> {
+    const res = await getDb().execute({ sql: 'SELECT fixed_params FROM apps WHERE id = ?', args: [appId] })
+    const existing = storedFixedParams(res.rows[0] ?? {})
+    const stored: FixedParam[] = params.map(p => {
+      if (!p.secret) return { in: p.in, name: p.name, secret: false, value: p.value ?? '' }
+      if (p.value) return { in: p.in, name: p.name, secret: true, value: encryptSecret(p.value, fixedParamContext(appId, p.in, p.name)) }
+      const kept = existing.find(e => e.secret && e.in === p.in && e.name === p.name)
+      return { in: p.in, name: p.name, secret: true, ...(kept?.value ? { value: kept.value } : {}) }
+    })
+    await getDb().execute({
+      sql: `UPDATE apps SET fixed_params = ?, updated_at = ? WHERE id = ?${ownerId ? ' AND owner_id = ?' : ''}`,
+      args: [stored.length ? JSON.stringify(stored) : null, Date.now(), appId, ...(ownerId ? [ownerId] : [])],
+    })
+  },
+
   async getApiKey(appId: string): Promise<string | undefined> {
     const res = await getDb().execute({ sql: 'SELECT api_key FROM apps WHERE id = ?', args: [appId] })
     const stored = res.rows[0]?.api_key

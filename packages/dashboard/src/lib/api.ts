@@ -40,6 +40,7 @@ export interface App {
   apiKeyIn?: 'header' | 'query'
   authType?: 'api_key' | 'oauth2_client_credentials'
   oauth?: { tokenUrl: string; clientId: string; scope?: string; audience?: string; clientAuth: 'basic' | 'post' }
+  fixedParams?: { in: 'header' | 'query'; name: string; secret: boolean; value?: string; hasValue?: boolean }[]
   hasApiKey: boolean
   rateLimitPerMin: number | null
   readOnly?: boolean
@@ -177,7 +178,7 @@ export const api = {
       authType?: App['authType']
       oauth?: App['oauth']
     }) => http.post<App>('/apps', data).then(r => r.data),
-    update: (id: string, patch: { name?: string; apiKey?: string | null; apiKeyHeader?: string; apiKeyIn?: 'header' | 'query'; authType?: App['authType']; oauth?: App['oauth']; rateLimitPerMin?: number | null; readOnly?: boolean }) =>
+    update: (id: string, patch: { name?: string; apiKey?: string | null; apiKeyHeader?: string; apiKeyIn?: 'header' | 'query'; authType?: App['authType']; oauth?: App['oauth']; fixedParams?: { in: 'header' | 'query'; name: string; secret: boolean; value: string | null }[]; rateLimitPerMin?: number | null; readOnly?: boolean }) =>
       http.patch<App>(`/apps/${id}`, patch).then(r => r.data),
     delete: (id: string) => http.delete(`/apps/${id}`).then(r => r.data),
     import: (id: string, specUrl?: string) =>
