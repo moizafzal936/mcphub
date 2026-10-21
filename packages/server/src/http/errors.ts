@@ -31,6 +31,11 @@ export function errorHandler(err: any, req: Request, res: Response, _next: NextF
     res.status(400).json({ error: 'Invalid request', details: err.flatten() })
     return
   }
+  if (err?.code === 'SSRF_BLOCKED') {
+    // A URL the user supplied was refused by the outbound policy (bad scheme, private address).
+    res.status(400).json({ error: err.message })
+    return
+  }
   if (err?.type === 'entity.parse.failed') {
     res.status(400).json({ error: 'Malformed JSON body' })
     return

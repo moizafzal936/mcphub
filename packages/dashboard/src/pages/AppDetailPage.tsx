@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft, RefreshCw, Zap, ToggleLeft, ToggleRight,
   Clock, CheckCircle, XCircle, Activity, Terminal, List, Radio,
@@ -15,6 +15,7 @@ import { CurlImportModal } from '../components/CurlImportModal.tsx'
 import { ImportSpecModal } from '../components/ImportSpecModal.tsx'
 
 type Tab = 'connect' | 'tools' | 'test' | 'playground' | 'logs' | 'settings'
+const TAB_KEYS: Tab[] = ['connect', 'tools', 'test', 'playground', 'logs', 'settings']
 
 const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']
 
@@ -300,7 +301,9 @@ export default function AppDetailPage() {
   const [app, setApp] = useState<App | null>(null)
   const [tools, setTools] = useState<McpTool[]>([])
   const [logs, setLogs] = useState<ToolCallLog[]>([])
-  const [tab, setTab] = useState<Tab>('connect')
+  const [searchParams] = useSearchParams()
+  const requestedTab = searchParams.get('tab') as Tab | null
+  const [tab, setTab] = useState<Tab>(requestedTab && TAB_KEYS.includes(requestedTab) ? requestedTab : 'connect')
   const [loading, setLoading] = useState(true)
   const [importing, setImporting] = useState(false)
   const [liveLogs, setLiveLogs] = useState(false)
@@ -506,7 +509,7 @@ export default function AppDetailPage() {
 
       {showSpec && <ImportSpecModal app={{ ...app, toolCount: tools.length }} onClose={() => setShowSpec(false)} onImported={ts => { setTools(ts); setTab('tools') }} />}
       {showCurl && <CurlImportModal app={app} onClose={() => setShowCurl(false)} onAdded={tool => setTools(ts => [...ts, tool])} />}
-      {tab === 'settings' && <SettingsPanel app={app} onUpdated={setApp} />}
+      {tab === 'settings' && <SettingsPanel key={app.id} app={app} onUpdated={setApp} />}
       {tab === 'playground' && <PlaygroundPanel app={app} />}
 
       {/* Tools tab */}

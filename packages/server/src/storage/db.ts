@@ -301,12 +301,12 @@ export const appRepo = {
 
   async insert(app: App, apiKey: string | undefined): Promise<void> {
     await getDb().execute({
-      sql: `INSERT INTO apps (id, owner_id, name, base_url, spec_url, api_key, api_key_header, rate_limit_per_min, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      sql: `INSERT INTO apps (id, owner_id, name, base_url, spec_url, api_key, api_key_header, rate_limit_per_min, read_only, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
         app.id, app.ownerId, app.name, app.baseUrl, app.specUrl ?? null,
         apiKey ? encryptSecret(apiKey, appSecretContext(app.id)) : null,
-        app.apiKeyHeader, app.rateLimitPerMin, app.createdAt, app.updatedAt,
+        app.apiKeyHeader, app.rateLimitPerMin, app.readOnly ? 1 : 0, app.createdAt, app.updatedAt,
       ],
     })
   },

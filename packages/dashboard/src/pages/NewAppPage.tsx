@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, Loader2, Zap, ChevronDown, ChevronUp } from 'lucide-react'
+import { ArrowLeft, Loader2, Zap, ChevronDown, ChevronUp, Upload } from 'lucide-react'
 import { api, apiError } from '../lib/api.ts'
 import { useToast } from '../components/Toast.tsx'
 
@@ -113,6 +113,27 @@ export default function NewAppPage() {
     apiKeyHeader: 'Authorization',
   })
 
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [importingFile, setImportingFile] = useState(false)
+
+  async function importFile(file: File | undefined) {
+    if (!file) return
+    setImportingFile(true)
+    setErrMsg('')
+    try {
+      const app = await api.apps.importConfig(await file.text())
+      const skipped = app.skipped.length ? ` · ${app.skipped.length} unsafe parameter${app.skipped.length === 1 ? '' : 's'} skipped` : ''
+      const count = app.toolCount ?? 0
+      success(`${count} tool${count === 1 ? '' : 's'} imported`,`${app.name} is live. Add its API key in Settings if it needs one${skipped}`)
+      navigate(`/apps/${app.id}`)
+    } catch (err) {
+      error('Could not import this file', apiError(err).replace(/^Import failed: /, ''))
+    } finally {
+      setImportingFile(false)
+      if (fileRef.current) fileRef.current.value = ''
+    }
+  }
+
   function set(field: string, value: string) {
     setForm(f => ({ ...f, [field]: value }))
   }
@@ -195,6 +216,20 @@ export default function NewAppPage() {
               </div>
             </button>
           ))}
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
+          <span>Moving an app from another MCPHub server?</span>
+          <button
+            type="button" onClick={() => fileRef.current?.click()} disabled={importingFile}
+            className="flex items-center gap-1.5 text-brand-400 hover:text-brand-300 disabled:opacity-50"
+          >
+            {importingFile ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+            Import an exported config (.mcphub.json)
+          </button>
+          <input
+            ref={fileRef} type="file" accept=".json,application/json" className="hidden" aria-label="MCPHub config file"
+            onChange={e => importFile(e.target.files?.[0])}
+          />
         </div>
       </div>
 

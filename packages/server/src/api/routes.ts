@@ -5,6 +5,7 @@ import { parseOpenApiSpec, parseSpecDocument, parseSpecText } from '../ingestion
 import { runTool } from '../ingestion/runTool.js'
 import { toolFromCurl } from '../ingestion/curl.js'
 import { isPostmanCollection, toolsFromPostman } from '../ingestion/postman.js'
+import { appConfigSchema, exportAppConfig, toolsFromConfig } from '../ingestion/appConfig.js'
 import {
   MAX_TOOLS_PER_APP, ToolInputError, isValidParamName, isValidToolName, pathPlaceholders, sanitizeParameters, validateToolPath,
 } from '../ingestion/toolSchema.js'
@@ -220,6 +221,66 @@ router.post('/apps/:id/import-spec', express.text({ type: () => true, limit: '10
   if (!tools.length) throw new HttpError(422, 'No usable requests found in this file')
   await toolRepo.replaceAllForApp(app.id, tools)
   res.json({ imported: tools.length, tools, format, skipped })
+}))
+
+// ── Config export / import (moves an app between MCPHub servers, never its key) ──
+
+router.get('/apps/:id/export', asyncHandler(async (req, res) => {
+  const app = await ownedApp(req)
+  res.json(exportAppConfig(app, await toolRepo.findAllByAppId(app.id)))
+}))
+
+router.post('/apps/import-config', express.text({ type: () => true, limit: '5mb' }), asyncHandler(async (req, res) => {
+  if (typeof req.body !== 'string' || !req.body.trim()) throw new HttpError(400, 'Send the exported config as the request body')
+  let doc: unknown
+  try {
+    doc = JSON.parse(req.body)
+  } catch {
+    throw new HttpError(422, 'Import failed: the file is not valid JSON')
+  }
+  let config, settings, specUrl: string | undefined
+  try {
+    config = appConfigSchema.parse(doc)
+    settings = createAppSchema.pick({ name: true, baseUrl: true, apiKeyHeader: true, rateLimitPerMin: true }).parse({
+      name: config.app.name,
+      baseUrl: config.app.baseUrl,
+      apiKeyHeader: config.app.apiKeyHeader,
+      rateLimitPerMin: config.app.rateLimitPerMin ?? null,
+    })
+    specUrl = config.app.specUrl ? z.string().trim().url().max(2048).parse(config.app.specUrl) : undefined
+    if (specUrl) parseOutboundUrl(specUrl)
+  } catch (err: any) {
+    if (err?.code === 'SSRF_BLOCKED') throw new HttpError(422, `Import failed: spec URL: ${err.message}`)
+    if (!(err instanceof z.ZodError)) throw err
+    const issue = err.issues[0]
+    throw new HttpError(422, `Import failed: ${issue.path.length ? `${issue.path.join('.')}: ` : ''}${issue.message}`)
+  }
+  await ensurePublicTarget(settings.baseUrl, 'Base URL')
+
+  const now = Date.now()
+  const app: App = {
+    id: newId(),
+    ownerId: req.user!.id,
+    name: settings.name,
+    baseUrl: settings.baseUrl.replace(/\/+$/, ''),
+    specUrl,
+    apiKeyHeader: settings.apiKeyHeader,
+    hasApiKey: false,
+    rateLimitPerMin: settings.rateLimitPerMin,
+    readOnly: config.app.readOnly ?? false,
+    createdAt: now,
+    updatedAt: now,
+  }
+  let built
+  try {
+    built = toolsFromConfig(config, app.id, app.apiKeyHeader, newId)
+  } catch (err) {
+    if (err instanceof ToolInputError) throw new HttpError(422, `Import failed: ${err.message}`)
+    throw err
+  }
+  await appRepo.insert(app, undefined)
+  await toolRepo.insertMany(built.tools)
+  res.status(201).json({ ...publicApp(app), toolCount: built.tools.length, skipped: built.skipped })
 }))
 
 // ── Tools ──────────────────────────────────────────────────────────────────────

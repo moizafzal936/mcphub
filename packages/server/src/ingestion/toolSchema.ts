@@ -60,7 +60,7 @@ export function pathPlaceholders(path: string): string[] {
   return (path.match(/\{([^{}]+)\}/g) ?? []).map(p => p.slice(1, -1))
 }
 
-function normalizeType(type: unknown): string {
+export function normalizeType(type: unknown): string {
   if (Array.isArray(type)) {
     const first = type.find(t => typeof t === 'string' && JSON_TYPES.has(t) && t !== 'null')
     return first ?? 'string'

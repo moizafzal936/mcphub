@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Eye, KeyRound, Loader2, Trash2 } from 'lucide-react'
+import { Copy, Download, Eye, KeyRound, Loader2, Trash2 } from 'lucide-react'
 import { api, apiError, type App } from '../lib/api.ts'
 import { useToast } from './Toast.tsx'
 
@@ -13,7 +13,7 @@ export function SettingsPanel({ app, onUpdated }: { app: App; onUpdated: (app: A
   const [header, setHeader] = useState(app.apiKeyHeader)
   const [rate, setRate] = useState(app.rateLimitPerMin?.toString() ?? '')
   const [newKey, setNewKey] = useState('')
-  const [busy, setBusy] = useState<'save' | 'key' | 'clear' | 'delete' | null>(null)
+  const [busy, setBusy] = useState<'save' | 'key' | 'clear' | 'delete' | 'export' | 'duplicate' | null>(null)
 
   async function save(patch: Parameters<typeof api.apps.update>[1], kind: 'save' | 'key' | 'clear', message: string) {
     setBusy(kind)
@@ -37,6 +37,40 @@ export function SettingsPanel({ app, onUpdated }: { app: App; onUpdated: (app: A
       return
     }
     save({ name: name.trim(), apiKeyHeader: header.trim(), rateLimitPerMin: rateValue }, 'save', 'Settings saved')
+  }
+
+  async function exportConfig() {
+    setBusy('export')
+    try {
+      const config = await api.apps.exportConfig(app.id)
+      const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${app.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'app'}.mcphub.json`
+      a.click()
+      URL.revokeObjectURL(url)
+      success('Config downloaded', 'Import it on another MCPHub server from Connect API')
+    } catch (err) {
+      error('Could not export', apiError(err))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function duplicate() {
+    setBusy('duplicate')
+    try {
+      const config = await api.apps.exportConfig(app.id) as { app: { name: string } }
+      config.app.name = `${app.name} (copy)`.slice(0, 100)
+      const copy = await api.apps.importConfig(JSON.stringify(config))
+      success('App duplicated', app.hasApiKey ? 'Add the API key in the copy\'s Settings' : copy.name)
+      navigate(`/apps/${copy.id}?tab=settings`)
+    } catch (err) {
+      error('Could not duplicate', apiError(err))
+    } finally {
+      setBusy(null)
+    }
   }
 
   async function remove() {
@@ -124,6 +158,24 @@ export function SettingsPanel({ app, onUpdated }: { app: App; onUpdated: (app: A
             Remove stored key
           </button>
         )}
+      </div>
+
+      <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-3">
+        <h2 className="font-semibold text-white">Export &amp; duplicate</h2>
+        <p className="text-sm text-gray-500">
+          Download this app's settings and tools as a file to set it up on another MCPHub server, or make a copy here to experiment.
+          The API key is never included.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <button onClick={exportConfig} disabled={busy !== null} className="flex items-center gap-2 border border-gray-700 text-gray-200 hover:bg-gray-800 disabled:opacity-50 px-4 py-2 rounded-lg text-sm font-medium">
+            {busy === 'export' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            Download config
+          </button>
+          <button onClick={duplicate} disabled={busy !== null} className="flex items-center gap-2 border border-gray-700 text-gray-200 hover:bg-gray-800 disabled:opacity-50 px-4 py-2 rounded-lg text-sm font-medium">
+            {busy === 'duplicate' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Copy className="w-4 h-4" />}
+            Duplicate app
+          </button>
+        </div>
       </div>
 
       <div className="bg-gray-900 border border-red-950 rounded-xl p-6">

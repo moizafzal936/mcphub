@@ -146,6 +146,9 @@ export const api = {
     delete: (id: string) => http.delete(`/apps/${id}`).then(r => r.data),
     import: (id: string, specUrl?: string) =>
       http.post<{ imported: number; tools: McpTool[]; format?: 'openapi' | 'postman'; skipped?: string[] }>(`/apps/${id}/import`, specUrl ? { specUrl } : {}).then(r => r.data),
+    exportConfig: (id: string) => http.get<Record<string, unknown>>(`/apps/${id}/export`).then(r => r.data),
+    importConfig: (config: string) =>
+      http.post<App & { skipped: string[] }>('/apps/import-config', config, { headers: { 'Content-Type': 'text/plain' } }).then(r => r.data),
     importSpecText: (id: string, spec: string) =>
       http.post<{ imported: number; tools: McpTool[]; format?: 'openapi' | 'postman'; skipped?: string[] }>(`/apps/${id}/import-spec`, spec, { headers: { 'Content-Type': 'text/plain' }, timeout: 60_000 }).then(r => r.data),
   },
