@@ -329,6 +329,7 @@ export default function AppDetailPage() {
         setApp(app)
         setTools(tools)
         setLogs(logs)
+        if (tools.length === 0) setTab('tools')
       })
       .catch(() => error('Failed to load app'))
       .finally(() => setLoading(false))
@@ -515,25 +516,22 @@ export default function AppDetailPage() {
           </div>
           <div className="space-y-1.5">
             {tools.length === 0 && (
-              <div className="text-center py-16 text-gray-600">
-                <p className="mb-2">No tools yet.</p>
-                <p className="text-xs mb-4">Add tools manually or import from an OpenAPI spec.</p>
-                <div className="flex items-center justify-center gap-3">
-                  <button
-                    onClick={() => setShowAddTool(true)}
-                    className="flex items-center gap-1.5 text-brand-400 hover:text-brand-300 text-sm"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    Add first tool
-                  </button>
-                  {app.specUrl && (
-                    <>
-                      <span className="text-gray-800">·</span>
-                      <button onClick={reimport} className="text-brand-400 hover:text-brand-300 text-sm">
-                        Import from spec →
-                      </button>
-                    </>
-                  )}
+              <div className="py-10">
+                <p className="text-center text-white font-semibold mb-1">Add your first tools</p>
+                <p className="text-center text-xs text-gray-500 mb-6">Pick whichever you have for this API. You can mix them later.</p>
+                <div className="grid sm:grid-cols-3 gap-3">
+                  {[
+                    { icon: FileUp, title: 'Import a spec', desc: 'OpenAPI or Postman — URL, file or paste', onClick: () => setShowSpec(true) },
+                    { icon: TerminalSquare, title: 'Paste a curl', desc: 'Copy an example from the API docs', onClick: () => setShowCurl(true) },
+                    { icon: Plus, title: 'Add by hand', desc: 'Method, path and parameters', onClick: () => setShowAddTool(true) },
+                  ].map(o => (
+                    <button key={o.title} onClick={o.onClick}
+                      className="text-left bg-gray-900 border border-gray-800 hover:border-brand-800 rounded-xl p-4 transition-colors">
+                      <o.icon className="w-4 h-4 text-brand-400 mb-2" />
+                      <p className="text-sm font-medium text-white">{o.title}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{o.desc}</p>
+                    </button>
+                  ))}
                 </div>
               </div>
             )}
