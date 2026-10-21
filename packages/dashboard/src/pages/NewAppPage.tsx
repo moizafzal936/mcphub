@@ -4,27 +4,54 @@ import { ArrowLeft, Loader2, Zap, ChevronDown, ChevronUp } from 'lucide-react'
 import { api, apiError } from '../lib/api.ts'
 import { useToast } from '../components/Toast.tsx'
 
-const PRESETS = [
+type PresetTool = {
+  name: string
+  description: string
+  method: string
+  path: string
+  queryParams?: { name: string; description: string; required: boolean; in?: 'query' | 'header' | 'body'; type?: string }[]
+}
+
+// Presets without a spec ship curated tools so every demo app works immediately.
+const PRESETS: { name: string; baseUrl: string; specUrl: string; icon: string; desc: string; tools?: PresetTool[] }[] = [
   {
     name: 'Petstore (Demo)',
     baseUrl: 'https://petstore3.swagger.io/api/v3',
     specUrl: 'https://petstore3.swagger.io/api/v3/openapi.json',
     icon: '🐾',
-    desc: '19 tools — great for testing',
+    desc: '19 tools from its OpenAPI spec',
   },
   {
-    name: 'JSONPlaceholder',
-    baseUrl: 'https://jsonplaceholder.typicode.com',
+    name: 'Weather (Open-Meteo)',
+    baseUrl: 'https://api.open-meteo.com/v1',
     specUrl: '',
-    icon: '📋',
-    desc: 'Free fake REST API for testing',
+    icon: '🌦️',
+    desc: 'Live weather for any place, no key needed',
+    tools: [{
+      name: 'get_forecast',
+      description: 'Current weather and daily forecast for a latitude/longitude. Use current="temperature_2m,wind_speed_10m" and daily="temperature_2m_max,temperature_2m_min"; timezone="auto".',
+      method: 'GET',
+      path: '/forecast',
+      queryParams: [
+        { name: 'latitude', description: 'Latitude, e.g. 31.52', required: true, type: 'number' },
+        { name: 'longitude', description: 'Longitude, e.g. 74.35', required: true, type: 'number' },
+        { name: 'current', description: 'Comma-separated current variables, e.g. temperature_2m,wind_speed_10m', required: false },
+        { name: 'daily', description: 'Comma-separated daily variables, e.g. temperature_2m_max,temperature_2m_min', required: false },
+        { name: 'timezone', description: 'Use "auto" for local time', required: false },
+        { name: 'forecast_days', description: 'Number of days (1-16)', required: false, type: 'integer' },
+      ],
+    }],
   },
   {
     name: 'Hacker News',
     baseUrl: 'https://hacker-news.firebaseio.com/v0',
     specUrl: '',
     icon: '📰',
-    desc: 'Read HN stories and comments',
+    desc: 'Top stories and comments',
+    tools: [
+      { name: 'top_stories', description: 'IDs of the current top Hacker News stories, best first. Fetch details with get_item.', method: 'GET', path: '/topstories.json' },
+      { name: 'get_item', description: 'A Hacker News story, comment or poll by numeric ID: title, url, score, author and child comment IDs.', method: 'GET', path: '/item/{id}.json' },
+    ],
   },
   {
     name: 'Open Library',
@@ -32,13 +59,35 @@ const PRESETS = [
     specUrl: '',
     icon: '📚',
     desc: 'Search millions of books',
+    tools: [{
+      name: 'search_books',
+      description: 'Search books by title, author or keyword. Returns titles, authors and first publish year.',
+      method: 'GET',
+      path: '/search.json',
+      queryParams: [
+        { name: 'q', description: 'Search text, e.g. "dune herbert"', required: true },
+        { name: 'limit', description: 'Max results (keep small, e.g. 5)', required: false, type: 'integer' },
+        { name: 'fields', description: 'Comma-separated fields, e.g. title,author_name,first_publish_year', required: false },
+      ],
+    }],
   },
   {
-    name: 'GitHub API',
-    baseUrl: 'https://api.github.com',
-    specUrl: 'https://raw.githubusercontent.com/github/rest-api-description/main/descriptions/api.github.com/api.github.com.json',
-    icon: '🐱',
-    desc: 'Full GitHub REST API',
+    name: 'JSONPlaceholder',
+    baseUrl: 'https://jsonplaceholder.typicode.com',
+    specUrl: '',
+    icon: '📋',
+    desc: 'Fake blog API with reads and writes',
+    tools: [
+      { name: 'list_posts', description: 'List blog posts, optionally only those by one user.', method: 'GET', path: '/posts',
+        queryParams: [{ name: 'userId', description: 'Only posts by this user ID', required: false, type: 'integer' }] },
+      { name: 'get_post', description: 'One blog post by ID.', method: 'GET', path: '/posts/{id}' },
+      { name: 'create_post', description: 'Create a blog post (the API fakes the write and echoes it back).', method: 'POST', path: '/posts',
+        queryParams: [
+          { name: 'title', description: 'Post title', required: true, in: 'body' },
+          { name: 'body', description: 'Post text', required: true, in: 'body' },
+          { name: 'userId', description: 'Author user ID', required: true, in: 'body', type: 'integer' },
+        ] },
+    ],
   },
   {
     name: 'Custom API',
@@ -91,10 +140,18 @@ export default function NewAppPage() {
         apiKey: form.apiKey || undefined,
         apiKeyHeader: form.apiKeyHeader || 'Authorization',
       })
+      let toolCount = app.toolCount ?? 0
+      const preset = selectedPreset !== null ? PRESETS[selectedPreset] : undefined
+      if (preset?.tools && preset.baseUrl === form.baseUrl.trim().replace(/\/+$/, '')) {
+        for (const t of preset.tools) {
+          await api.tools.create(app.id, { ...t, queryParams: t.queryParams ?? [] })
+          toolCount++
+        }
+      }
       if (app.warning) {
         success('App created', app.warning)
       } else {
-        success(`${app.toolCount} tools generated!`, `${app.name} is ready`)
+        success(`${toolCount} tools ready`, `${app.name} is live`)
       }
       navigate(`/apps/${app.id}`)
     } catch (err: any) {
