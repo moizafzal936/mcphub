@@ -131,15 +131,18 @@ export default function AppsPage() {
               </div>
 
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2.5">
+                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
                   <h3 className="font-semibold text-white">{app.name}</h3>
-                  <span className="text-xs bg-gray-800 text-gray-400 px-2 py-0.5 rounded-full">
+                  <span className="text-xs bg-gray-800 text-gray-400 px-2 py-0.5 rounded-full whitespace-nowrap">
                     {app.toolCount ?? 0} tools
                   </span>
                   <span className="flex items-center gap-1 text-xs text-green-400 bg-green-950/50 border border-green-900/50 px-2 py-0.5 rounded-full">
                     <span className="w-1 h-1 rounded-full bg-green-400" />
                     Live
                   </span>
+                  {app.readOnly && (
+                    <span className="text-xs text-amber-300 bg-amber-950 border border-amber-900 px-2 py-0.5 rounded-full whitespace-nowrap">Read-only</span>
+                  )}
                 </div>
                 <p className="text-xs text-gray-600 truncate mt-0.5 font-mono">{app.baseUrl}</p>
                 {ago && (
