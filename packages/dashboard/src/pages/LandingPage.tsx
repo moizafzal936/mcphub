@@ -15,31 +15,31 @@ const TYPED_STRINGS = [
 const STEPS = [
   {
     num: '01',
-    title: 'Paste your API URL',
-    desc: 'Drop in your OpenAPI spec URL or any REST API base URL. We handle the rest.',
-    code: 'https://api.example.com/openapi.json',
+    title: 'Bring your API',
+    desc: 'Import an OpenAPI spec or Postman collection, paste a curl example from your docs, or add endpoints by hand.',
+    code: 'curl -X POST https://api.example.com/v1/notes …',
   },
   {
     num: '02',
-    title: 'Get your MCP server',
-    desc: 'We auto-generate tools from every endpoint and host your MCP server instantly.',
-    code: 'https://mcphub.io/mcp/abc123/sse',
+    title: 'Get an MCP server',
+    desc: 'Every endpoint becomes a typed MCP tool behind one URL, speaking the current Streamable HTTP transport.',
+    code: 'https://your-mcphub.example/mcp/abc123',
   },
   {
     num: '03',
-    title: 'Connect to Claude',
-    desc: 'Add one line to your Claude config. Done — Claude can now use your entire API.',
-    code: '{ "url": "…/mcp/abc123/sse" }',
+    title: 'Connect your AI',
+    desc: 'Paste the URL into Claude, Claude Code or Cursor, sign in, and click Allow. No config files or keys to copy.',
+    code: 'claude mcp add --transport http my-api https://…/mcp/abc123',
   },
 ]
 
 const FEATURES = [
-  { icon: Zap, title: 'Zero infrastructure', desc: 'No servers to run. Your MCP endpoint is hosted and always online.' },
-  { icon: Globe, title: 'Any REST API', desc: 'OpenAPI, Swagger, or raw base URL — we discover and generate automatically.' },
-  { icon: Layers, title: 'Live tool manager', desc: 'Enable/disable individual endpoints. Test tools directly in the dashboard.' },
-  { icon: Shield, title: 'Secure by default', desc: 'API keys stored encrypted. Auth forwarded securely to your API.' },
-  { icon: Terminal, title: 'Built-in playground', desc: 'Test every MCP tool without Claude. See real API responses instantly.' },
-  { icon: CheckCircle, title: 'Real-time logs', desc: 'Watch Claude call your tools live. Debug and monitor every request.' },
+  { icon: Globe, title: 'Any REST API', desc: 'OpenAPI (URL, file or paste), Postman collections, curl examples, or hand-written tools with typed parameters.' },
+  { icon: Zap, title: 'One-click connect', desc: 'Standard MCP OAuth sign-in for Claude, Claude Code and Cursor, plus revocable access tokens for scripts.' },
+  { icon: Shield, title: 'Secure by default', desc: 'Encrypted credentials, SSRF protection, per-request auth, rate limits and optional two-factor sign-in.' },
+  { icon: Layers, title: 'You stay in control', desc: 'Enable or disable tools, switch an app to read-only for AI clients, and disconnect any client instantly.' },
+  { icon: Terminal, title: 'Test and playground', desc: 'Run any tool from the dashboard, or chat with Claude while it calls your tools live.' },
+  { icon: CheckCircle, title: 'Live logs', desc: 'Watch every tool call as it happens, with sensitive values redacted and bounded retention.' },
 ]
 
 export default function LandingPage() {
@@ -175,18 +175,18 @@ export default function LandingPage() {
             <div className="w-3 h-3 rounded-full bg-red-500/70" />
             <div className="w-3 h-3 rounded-full bg-yellow-500/70" />
             <div className="w-3 h-3 rounded-full bg-green-500/70" />
-            <span className="text-xs text-gray-600 ml-2 font-mono">claude_desktop_config.json</span>
+            <span className="text-xs text-gray-600 ml-2 font-mono">~/.cursor/mcp.json</span>
           </div>
           <pre className="p-6 text-sm font-mono text-gray-300 leading-relaxed overflow-x-auto">
 {`{
   `}<span className="text-gray-500">"mcpServers"</span>{`: {
-    `}<span className="text-green-400">"my-stripe-api"</span>{`: {
-      `}<span className="text-gray-500">"url"</span>{`: `}<span className="text-brand-300">"https://mcphub.io/mcp/abc123/sse"</span>{`,
-      `}<span className="text-gray-500">"transport"</span>{`: `}<span className="text-yellow-300">"sse"</span>{`
+    `}<span className="text-green-400">"my-api"</span>{`: {
+      `}<span className="text-gray-500">"url"</span>{`: `}<span className="text-brand-300">"https://your-mcphub.example/mcp/abc123"</span>{`
     }
   }
 }`}
           </pre>
+          <p className="px-6 pb-5 -mt-2 text-xs text-gray-500">That's the whole config: the client opens a sign-in page, you click Allow, and the tools are live.</p>
         </div>
       </section>
 
