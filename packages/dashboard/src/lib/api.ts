@@ -116,6 +116,7 @@ export interface ExecResult {
   durationMs: number
   text: string
   error?: string
+  request?: { method: string; url: string }
 }
 
 export const api = {

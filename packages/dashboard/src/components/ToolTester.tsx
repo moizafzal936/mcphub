@@ -195,6 +195,11 @@ export function ToolTester({ appId, tools }: ToolTesterProps) {
                   <span className="text-xs text-gray-500">{result.durationMs}ms</span>
                   <span className="text-xs text-gray-600 ml-auto">Response</span>
                 </div>
+                {result.request && (
+                  <div className="px-5 py-2 border-b border-gray-800 flex-shrink-0 text-[11px] font-mono text-gray-500 break-all" title="Sent upstream (credential header not shown)">
+                    <span className="text-gray-400">{result.request.method}</span> {result.request.url}
+                  </div>
+                )}
                 <pre className="flex-1 overflow-auto p-4 text-xs text-gray-300 font-mono leading-relaxed">
                   {JSON.stringify(result.data, null, 2)}
                 </pre>

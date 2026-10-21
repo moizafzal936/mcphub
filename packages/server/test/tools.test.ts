@@ -167,3 +167,11 @@ test('Postman collections are detected and imported through the same endpoint', 
   assert.equal(run.body.data.id, 'pm-1')
   assert.equal(fx.upstreamHits.at(-1)!.url, '/v1/items/pm-1?verbose=2')
 })
+
+test('dashboard executions report the exact request sent, without the credential', async () => {
+  const app = await createApp(user, fx, { apiKey: 'sk-never-shown-123456' })
+  const tool = await addTool(user, app.id, { name: 'item', path: '/items/{id}', queryParams: [{ name: 'verbose', type: 'boolean' }] })
+  const res = await user.post(`/api/apps/${app.id}/tools/${tool.id}/execute`, { id: 'a b', verbose: 'true' })
+  assert.deepEqual(res.body.request, { method: 'GET', url: `http://127.0.0.1:${fx.upstreamPort}/v1/items/a%20b?verbose=true` })
+  assert.ok(!JSON.stringify(res.body).includes('sk-never-shown'))
+})

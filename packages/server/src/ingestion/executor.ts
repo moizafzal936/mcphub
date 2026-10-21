@@ -17,6 +17,8 @@ export interface ExecResult {
   text: string
   /** Set when the call never reached the upstream API (bad input, blocked destination, network). */
   error?: string
+  /** What was sent upstream (no headers, so never the credential). Shown to the owner only. */
+  request?: { method: string; url: string }
 }
 
 function fitArray(items: unknown[], budget: number): { kept: unknown[]; omitted: number } {
@@ -129,6 +131,10 @@ export async function executeTool(
     if (Object.keys(body).length === 0) body = undefined
   }
 
+  const shown = new URL(url)
+  for (const [k, v] of Object.entries(queryParams)) shown.searchParams.set(k, v)
+  const request = { method: tool.method, url: shown.toString() }
+
   try {
     const response = await safeRequest({
       method: tool.method,
@@ -147,7 +153,7 @@ export async function executeTool(
     try {
       parsed = JSON.parse(scrubbed)
     } catch {}
-    return { data: parsed, statusCode: response.status, durationMs: Date.now() - start, text: formatForModel(parsed) }
+    return { data: parsed, statusCode: response.status, durationMs: Date.now() - start, text: formatForModel(parsed), request }
   } catch (err: any) {
     if (err instanceof SsrfBlockedError || err?.cause instanceof SsrfBlockedError || err?.code === 'SSRF_BLOCKED') {
       return failure(start, 'Request blocked: destination is not a public address')
