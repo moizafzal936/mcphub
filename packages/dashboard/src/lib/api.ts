@@ -157,6 +157,10 @@ export const api = {
       http.post<McpToken & { token: string }>(`/apps/${appId}/tokens`, { name }).then(r => r.data),
     revoke: (appId: string, tokenId: string) => http.delete(`/apps/${appId}/tokens/${tokenId}`).then(r => r.data),
   },
+  orphans: {
+    status: () => http.get<{ count: number; canClaim: boolean }>('/orphans').then(r => r.data),
+    claim: () => http.post<{ claimed: number }>('/orphans/claim').then(r => r.data),
+  },
   grants: {
     list: (appId: string) => http.get<OAuthGrant[]>(`/apps/${appId}/grants`).then(r => r.data),
     revoke: (appId: string, grantId: string) => http.delete(`/apps/${appId}/grants/${grantId}`).then(r => r.data),

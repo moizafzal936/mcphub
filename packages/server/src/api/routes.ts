@@ -1,6 +1,6 @@
 import { Router, type Request } from 'express'
 import { z } from 'zod'
-import { appRepo, logRepo, newId, tokenRepo, toolRepo } from '../storage/db.js'
+import { appRepo, logRepo, newId, tokenRepo, toolRepo, userRepo } from '../storage/db.js'
 import { parseOpenApiSpec } from '../ingestion/openapi.js'
 import { runTool } from '../ingestion/runTool.js'
 import {
@@ -103,6 +103,18 @@ async function importSpec(specUrl: string, app: App): Promise<McpTool[]> {
     throw new HttpError(422, `Spec import failed: ${reason}`)
   }
 }
+
+// ── Ownerless apps (created before accounts existed); only the operator may claim ──
+
+router.get('/orphans', asyncHandler(async (req, res) => {
+  const isOperator = (await userRepo.operatorId()) === req.user!.id
+  res.json({ count: isOperator ? await appRepo.countOrphans() : 0, canClaim: isOperator })
+}))
+
+router.post('/orphans/claim', asyncHandler(async (req, res) => {
+  if ((await userRepo.operatorId()) !== req.user!.id) throw new HttpError(403, 'Only the server operator can claim these apps')
+  res.json({ claimed: await appRepo.assignOrphansTo(req.user!.id) })
+}))
 
 // ── Stats & apps ───────────────────────────────────────────────────────────────
 

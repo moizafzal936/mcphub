@@ -187,6 +187,12 @@ export const userRepo = {
     return r ? { id: String(r.id), email: String(r.email), createdAt: Number(r.created_at) } : undefined
   },
 
+  /** The operator is the first account created on this server. */
+  async operatorId(): Promise<string | undefined> {
+    const res = await getDb().execute('SELECT id FROM users ORDER BY created_at ASC, id ASC LIMIT 1')
+    return res.rows[0] ? String(res.rows[0].id) : undefined
+  },
+
   /** Inserts only if signup is allowed at commit time, so two racing "first user" signups can't both succeed. */
   async insertIf(user: User & { passwordHash: string }, onlyIfNoUsers: boolean): Promise<boolean> {
     const res = await getDb().execute({
@@ -300,6 +306,11 @@ export const appRepo = {
       { sql: 'DELETE FROM apps WHERE id = ? AND owner_id = ?', args: [id, ownerId] },
     ], 'write')
     return true
+  },
+
+  async countOrphans(): Promise<number> {
+    const res = await getDb().execute('SELECT COUNT(*) AS n FROM apps WHERE owner_id IS NULL')
+    return Number(res.rows[0].n)
   },
 
   async assignOrphansTo(ownerId: string): Promise<number> {
@@ -515,6 +526,12 @@ export async function purgeExpired(retentionDays: number, maxPerApp: number): Pr
     { sql: 'DELETE FROM oauth_requests WHERE expires_at < ?', args: [now] },
     { sql: 'DELETE FROM oauth_codes WHERE expires_at < ?', args: [now - 86_400_000] },
     { sql: 'DELETE FROM mcp_tokens WHERE kind = ? AND expires_at < ?', args: ['oauth', now - 86_400_000] },
+    // Dynamically registered OAuth clients with no live grant after 30 days.
+    {
+      sql: `DELETE FROM oauth_clients WHERE created_at < ? AND client_id NOT IN
+              (SELECT client_id FROM oauth_grants WHERE revoked_at IS NULL AND expires_at > ?)`,
+      args: [now - 30 * 86_400_000, now],
+    },
   ], 'write')
   return { logs: aged.rowsAffected + capped.rowsAffected, sessions: sessions.rowsAffected }
 }

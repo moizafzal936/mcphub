@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, Zap, Trash2, ExternalLink, Activity, Clock } from 'lucide-react'
-import { api, type App } from '../lib/api.ts'
+import { api, apiError, type App } from '../lib/api.ts'
 import { useToast } from '../components/Toast.tsx'
 
 function timeAgo(ts: number | null) {
@@ -18,9 +18,31 @@ export default function AppsPage() {
   const [loading, setLoading] = useState(true)
   const { success, error } = useToast()
 
-  useEffect(() => {
+  const [orphans, setOrphans] = useState(0)
+  const [claiming, setClaiming] = useState(false)
+
+  function load() {
     api.apps.list().then(setApps).catch(() => error('Failed to load apps')).finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    load()
+    api.orphans.status().then(s => setOrphans(s.canClaim ? s.count : 0)).catch(() => {})
   }, [])
+
+  async function claimOrphans() {
+    setClaiming(true)
+    try {
+      const { claimed } = await api.orphans.claim()
+      setOrphans(0)
+      success(`Claimed ${claimed} app${claimed === 1 ? '' : 's'}`, 'They now belong to your account')
+      load()
+    } catch (err) {
+      error('Could not claim apps', apiError(err))
+    } finally {
+      setClaiming(false)
+    }
+  }
 
   async function deleteApp(id: string, name: string) {
     if (!confirm(`Delete "${name}"? This removes all tools and logs.`)) return
@@ -53,6 +75,21 @@ export default function AppsPage() {
           Connect API
         </Link>
       </div>
+
+      {orphans > 0 && (
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center gap-3 bg-amber-950/30 border border-amber-900 rounded-xl px-4 py-3">
+          <p className="flex-1 text-sm text-amber-200">
+            {orphans} app{orphans === 1 ? ' was' : 's were'} created before accounts existed and {orphans === 1 ? 'has' : 'have'} no owner.
+            As this server's operator, you can claim {orphans === 1 ? 'it' : 'them'}.
+          </p>
+          <button
+            onClick={claimOrphans} disabled={claiming}
+            className="bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap"
+          >
+            {claiming ? 'Claiming…' : `Claim ${orphans === 1 ? 'app' : 'apps'}`}
+          </button>
+        </div>
+      )}
 
       {loading && (
         <div className="grid gap-3">

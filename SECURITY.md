@@ -3,8 +3,13 @@
 ## Deploying
 
 ```bash
+# Docker (single image: API + dashboard; data in /data)
+docker build -t mcphub .
+docker run -p 3001:3001 -v mcphub-data:/data -e MCPHUB_ENCRYPTION_KEY="$(openssl rand -base64 32)" \
+  -e MCPHUB_PUBLIC_URL=https://mcphub.example.com -e MCPHUB_TRUST_PROXY=1 mcphub
+
+# or PM2 on a VM
 npm ci && npm run build
-export MCPHUB_ENCRYPTION_KEY="$(openssl rand -base64 32)"   # store in your secret manager
 npx pm2 start ecosystem.config.cjs
 ```
 
@@ -22,8 +27,8 @@ Run one instance only: MCP sessions and rate-limit counters are in process memor
 
 - The first account registered becomes the operator. After that, sign-up is closed unless `MCPHUB_ALLOW_SIGNUP=true`.
   Register before exposing the server.
-- Apps created before authentication existed have no owner and are inaccessible until assigned:
-  `npm run assign-orphans -w packages/server -- you@example.com`
+- Apps created before authentication existed have no owner. The operator sees a "Claim apps" banner on the
+  dashboard (or run `npm run assign-orphans -w packages/server -- you@example.com`).
 - Plaintext credentials from earlier versions are encrypted automatically at startup.
 
 ## Security model
@@ -44,16 +49,27 @@ Run one instance only: MCP sessions and rate-limit counters are in process memor
 ## Known gaps
 
 - Claude.ai / Claude Desktop custom connectors need a public HTTPS deployment to reach the OAuth endpoints; locally, use Claude Code or mcp-remote.
-- Dynamic client registration is open (rate-limited per IP), as MCP clients require; registered clients are not garbage-collected yet.
+- Dynamic client registration is open (rate-limited per IP), as MCP clients require; clients without a live grant are purged after 30 days.
 - No email verification, password reset, MFA or account lockout UI. Login rate limiting is per IP and per email.
 - Single-node design: legacy SSE sessions and rate limits are in memory (Streamable HTTP itself is stateless).
-- No encryption-key rotation tooling (the ciphertext format is versioned to allow it).
 - Upstream responses are passed to the model as-is (minus the credential). Malicious API content can still attempt prompt injection against the client's model.
 - Dev-only tooling advisories remain (Vite 5 / esbuild dev server, Tailwind 3 dependencies). They need major-version upgrades and don't affect the production build output.
 
+## Rotating the encryption key
+
+Stop the server, then:
+
+```bash
+MCPHUB_ENCRYPTION_KEY=<current> MCPHUB_NEW_ENCRYPTION_KEY="$(openssl rand -base64 32)" npm run rotate-key -w packages/server
+```
+
+It backs up the database, verifies every secret decrypts with the current key, and re-encrypts all of them in
+one transaction (nothing changes if any check fails). Then switch `MCPHUB_ENCRYPTION_KEY` to the new key.
+
 ## Tests
 
-`npm test -w packages/server` covers authentication, cross-tenant authorization, CSRF, credential storage and exposure,
-SSRF (internal targets, IPv4/IPv6 forms, DNS rebinding, redirects, proxy env), MCP token and session isolation,
-revocation, expiry and connection caps, over both Streamable HTTP and SSE, and the OAuth flow (discovery, consent ownership, PKCE, single-use codes, resource binding, refresh rotation/replay, revocation). Rate limiting, argument-validation edge cases, path-containment rules,
-log retention and spec-parsing limits are implemented but have no dedicated automated tests yet.
+`npm test -w packages/server` (51 tests) covers authentication, cross-tenant authorization, CSRF, credential storage,
+exposure and rotation, SSRF (internal targets, IPv4/IPv6 forms, DNS rebinding, redirects, proxy env), MCP token and
+session isolation, revocation, expiry and connection caps over Streamable HTTP and SSE, the OAuth flow, rate limits,
+argument validation, log redaction/retention, ownerless-app claiming and hostile (self-referencing) specs.
+Path-containment rules for tool paths have no dedicated test file yet; the Docker image has not been built in CI.
