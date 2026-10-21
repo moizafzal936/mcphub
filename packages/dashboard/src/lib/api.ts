@@ -38,6 +38,8 @@ export interface App {
   specUrl?: string
   apiKeyHeader: string
   apiKeyIn?: 'header' | 'query'
+  authType?: 'api_key' | 'oauth2_client_credentials'
+  oauth?: { tokenUrl: string; clientId: string; scope?: string; audience?: string; clientAuth: 'basic' | 'post' }
   hasApiKey: boolean
   rateLimitPerMin: number | null
   readOnly?: boolean
@@ -172,12 +174,16 @@ export const api = {
       apiKey?: string
       apiKeyHeader?: string
       apiKeyIn?: 'header' | 'query'
+      authType?: App['authType']
+      oauth?: App['oauth']
     }) => http.post<App>('/apps', data).then(r => r.data),
-    update: (id: string, patch: { name?: string; apiKey?: string | null; apiKeyHeader?: string; apiKeyIn?: 'header' | 'query'; rateLimitPerMin?: number | null; readOnly?: boolean }) =>
+    update: (id: string, patch: { name?: string; apiKey?: string | null; apiKeyHeader?: string; apiKeyIn?: 'header' | 'query'; authType?: App['authType']; oauth?: App['oauth']; rateLimitPerMin?: number | null; readOnly?: boolean }) =>
       http.patch<App>(`/apps/${id}`, patch).then(r => r.data),
     delete: (id: string) => http.delete(`/apps/${id}`).then(r => r.data),
     import: (id: string, specUrl?: string) =>
       http.post<{ imported: number; tools: McpTool[]; format?: 'openapi' | 'postman'; skipped?: string[] }>(`/apps/${id}/import`, specUrl ? { specUrl } : {}).then(r => r.data),
+    testAuth: (id: string) =>
+      http.post<{ ok: boolean; error?: string; tokenType?: string; expiresIn?: number; scope?: string }>(`/apps/${id}/auth/test`).then(r => r.data),
     exportConfig: (id: string) => http.get<Record<string, unknown>>(`/apps/${id}/export`).then(r => r.data),
     importConfig: (config: string) =>
       http.post<App & { skipped: string[] }>('/apps/import-config', config, { headers: { 'Content-Type': 'text/plain' } }).then(r => r.data),

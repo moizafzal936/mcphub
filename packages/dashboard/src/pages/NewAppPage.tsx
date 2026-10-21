@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { ArrowLeft, Loader2, Zap, ChevronDown, ChevronUp, Upload } from 'lucide-react'
 import { api, apiError } from '../lib/api.ts'
 import { useToast } from '../components/Toast.tsx'
+import { OAuthFields, fromOAuthForm, toOAuthForm } from '../components/OAuthFields.tsx'
 
 type PresetTool = {
   name: string
@@ -112,7 +113,9 @@ export default function NewAppPage() {
     apiKey: '',
     apiKeyHeader: 'Authorization',
     apiKeyIn: 'header' as 'header' | 'query',
+    authType: 'api_key' as 'api_key' | 'oauth2_client_credentials',
   })
+  const [oauth, setOauth] = useState(toOAuthForm())
 
   const fileRef = useRef<HTMLInputElement>(null)
   const [importingFile, setImportingFile] = useState(false)
@@ -160,8 +163,9 @@ export default function NewAppPage() {
         baseUrl: form.baseUrl,
         specUrl: form.specUrl || undefined,
         apiKey: form.apiKey || undefined,
-        apiKeyHeader: form.apiKeyHeader || (form.apiKeyIn === 'query' ? 'api_key' : 'Authorization'),
-        apiKeyIn: form.apiKeyIn,
+        ...(form.authType === 'oauth2_client_credentials'
+          ? { authType: form.authType, oauth: fromOAuthForm(oauth) }
+          : { apiKeyHeader: form.apiKeyHeader || (form.apiKeyIn === 'query' ? 'api_key' : 'Authorization'), apiKeyIn: form.apiKeyIn }),
       })
       let toolCount = app.toolCount ?? 0
       const preset = selectedPreset !== null ? PRESETS[selectedPreset] : undefined
@@ -285,6 +289,20 @@ export default function NewAppPage() {
 
           {showAdvanced && (
             <div className="border-t border-gray-800 pt-4 space-y-4">
+              <Field label="Authentication">
+                <select value={form.authType} onChange={e => set('authType', e.target.value)} className="input">
+                  <option value="api_key">API key or token</option>
+                  <option value="oauth2_client_credentials">OAuth 2.0 client credentials</option>
+                </select>
+              </Field>
+              {form.authType === 'oauth2_client_credentials' ? (
+                <>
+                  <OAuthFields value={oauth} onChange={setOauth} inputClass="input" />
+                  <Field label="Client secret" hint="Stored encrypted. MCPHub fetches and refreshes access tokens; AI clients never see the secret or tokens.">
+                    <input type="password" autoComplete="off" value={form.apiKey} onChange={e => set('apiKey', e.target.value)} className="input" />
+                  </Field>
+                </>
+              ) : (<>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Send key in">
                   <select
@@ -328,6 +346,7 @@ export default function NewAppPage() {
                   className="input"
                 />
               </Field>
+              </>)}
             </div>
           )}
 

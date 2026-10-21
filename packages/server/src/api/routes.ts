@@ -7,6 +7,7 @@ import { toolFromCurl } from '../ingestion/curl.js'
 import { isPostmanCollection, toolsFromPostman } from '../ingestion/postman.js'
 import { appConfigSchema, exportAppConfig, toolsFromConfig } from '../ingestion/appConfig.js'
 import { assessReadiness } from '../ingestion/readiness.js'
+import { forgetAccessToken, requestToken, UpstreamAuthError } from '../ingestion/upstreamAuth.js'
 import {
   MAX_RESPONSE_FIELDS, MAX_TOOLS_PER_APP, ToolInputError, isValidCredentialName, isValidFieldPath, isValidParamName, isValidToolName, pathPlaceholders, sanitizeParameters,
   toolForApp, validateToolPath,
@@ -50,6 +51,40 @@ function credentialSetting(where: App['apiKeyIn'] | undefined, name: string | un
 }
 const rateLimitSchema = z.number().int().min(1).max(100_000).nullable()
 
+const optionalText = (max: number) => z.string().trim().max(max).optional().transform(v => v || undefined)
+const oauthConfigSchema = z.object({
+  tokenUrl: z.string().trim().max(2048).superRefine((value, ctx) => {
+    try {
+      if (parseOutboundUrl(value).hash) ctx.addIssue({ code: 'custom', message: 'Token URL must not include a fragment' })
+    } catch (err: any) {
+      ctx.addIssue({ code: 'custom', message: err.message })
+    }
+  }),
+  clientId: z.string().trim().min(1).max(512),
+  scope: optionalText(1024),
+  audience: optionalText(1024),
+  clientAuth: z.enum(['basic', 'post']).optional().default('basic'),
+}).strict()
+const authTypeSchema = z.enum(['api_key', 'oauth2_client_credentials'])
+
+/**
+ * Resolves how the app authenticates upstream. With OAuth client credentials the stored secret is
+ * the client secret and tokens always go in "Authorization: Bearer"; the token URL must be public.
+ */
+async function authSetting(
+  authType: App['authType'],
+  oauth: App['oauth'] | undefined,
+  apiKeyIn?: App['apiKeyIn'],
+  apiKeyHeader?: string
+): Promise<{ authType: App['authType']; oauth: App['oauth'] | null; apiKeyIn: App['apiKeyIn']; apiKeyHeader: string }> {
+  if (authType === 'oauth2_client_credentials') {
+    if (!oauth) throw new HttpError(400, 'OAuth client credentials need a token URL and a client ID')
+    await ensurePublicTarget(oauth.tokenUrl, 'Token URL')
+    return { authType, oauth, apiKeyIn: 'header', apiKeyHeader: 'Authorization' }
+  }
+  return { authType: 'api_key', oauth: null, ...credentialSetting(apiKeyIn, apiKeyHeader) }
+}
+
 const createAppSchema = z.object({
   name: z.string().trim().min(1).max(100),
   baseUrl: baseUrlSchema,
@@ -57,6 +92,8 @@ const createAppSchema = z.object({
   apiKey: z.string().max(4096).optional().or(z.literal('').transform(() => undefined)),
   apiKeyHeader: credentialNameSchema.optional(),
   apiKeyIn: credentialInSchema.optional(),
+  authType: authTypeSchema.optional(),
+  oauth: oauthConfigSchema.optional(),
   rateLimitPerMin: rateLimitSchema.optional().default(null),
 })
 
@@ -65,6 +102,8 @@ const updateAppSchema = z.object({
   apiKey: z.string().max(4096).nullable().optional(),
   apiKeyHeader: credentialNameSchema.optional(),
   apiKeyIn: credentialInSchema.optional(),
+  authType: authTypeSchema.optional(),
+  oauth: oauthConfigSchema.optional(),
   rateLimitPerMin: rateLimitSchema.optional(),
   readOnly: z.boolean().optional(),
 }).strict()
@@ -167,7 +206,7 @@ router.get('/apps/:id', asyncHandler(async (req, res) => {
 
 router.post('/apps', asyncHandler(async (req, res) => {
   const input = createAppSchema.parse(req.body)
-  const credential = credentialSetting(input.apiKeyIn, input.apiKeyHeader)
+  const { oauth, ...credential } = await authSetting(input.authType ?? 'api_key', input.oauth, input.apiKeyIn, input.apiKeyHeader)
   await ensurePublicTarget(input.baseUrl, 'Base URL')
   if (input.specUrl) parseOutboundUrl(input.specUrl)
 
@@ -179,6 +218,7 @@ router.post('/apps', asyncHandler(async (req, res) => {
     baseUrl: input.baseUrl.replace(/\/+$/, ''),
     specUrl: input.specUrl,
     ...credential,
+    ...(oauth ? { oauth } : {}),
     hasApiKey: !!input.apiKey,
     rateLimitPerMin: input.rateLimitPerMin,
     readOnly: false,
@@ -200,11 +240,18 @@ router.post('/apps', asyncHandler(async (req, res) => {
 
 router.patch('/apps/:id', asyncHandler(async (req, res) => {
   const app = await ownedApp(req)
-  const patch = updateAppSchema.parse(req.body)
-  if (patch.apiKeyIn !== undefined || patch.apiKeyHeader !== undefined) {
-    Object.assign(patch, credentialSetting(patch.apiKeyIn ?? app.apiKeyIn, patch.apiKeyHeader ?? (patch.apiKeyIn && patch.apiKeyIn !== app.apiKeyIn ? undefined : app.apiKeyHeader)))
+  const { oauth: oauthPatch, ...patch } = updateAppSchema.parse(req.body)
+  let auth: Awaited<ReturnType<typeof authSetting>> | undefined
+  if (patch.authType !== undefined || oauthPatch !== undefined || patch.apiKeyIn !== undefined || patch.apiKeyHeader !== undefined) {
+    const authType = patch.authType ?? app.authType
+    // Switching method resets the credential location to that method's default unless one is given.
+    const keepLocation = authType === app.authType
+    const apiKeyIn = patch.apiKeyIn ?? (keepLocation ? app.apiKeyIn : undefined)
+    const apiKeyHeader = patch.apiKeyHeader ?? (keepLocation && (!patch.apiKeyIn || patch.apiKeyIn === app.apiKeyIn) ? app.apiKeyHeader : undefined)
+    auth = await authSetting(authType, oauthPatch ?? app.oauth, apiKeyIn, apiKeyHeader)
   }
-  await appRepo.update(app.id, req.user!.id, patch)
+  await appRepo.update(app.id, req.user!.id, { ...patch, ...auth })
+  forgetAccessToken(app.id)
   const updated = (await appRepo.findForOwner(app.id, req.user!.id))!
   res.json(publicApp(updated))
 }))
@@ -213,6 +260,7 @@ router.delete('/apps/:id', asyncHandler(async (req, res) => {
   const app = await ownedApp(req)
   await closeSessions(s => s.appId === app.id)
   await appRepo.deleteForOwner(app.id, req.user!.id)
+  forgetAccessToken(app.id)
   res.json({ ok: true })
 }))
 
@@ -264,7 +312,8 @@ router.post('/apps/import-config', express.text({ type: () => true, limit: '5mb'
   } catch {
     throw new HttpError(422, 'Import failed: the file is not valid JSON')
   }
-  let config, settings, credential, specUrl: string | undefined
+  let config, settings, specUrl: string | undefined
+  let oauthConfig: App['oauth'] | undefined
   try {
     config = appConfigSchema.parse(doc)
     settings = createAppSchema.pick({ name: true, baseUrl: true, rateLimitPerMin: true }).parse({
@@ -272,18 +321,25 @@ router.post('/apps/import-config', express.text({ type: () => true, limit: '5mb'
       baseUrl: config.app.baseUrl,
       rateLimitPerMin: config.app.rateLimitPerMin ?? null,
     })
-    credential = credentialSetting(config.app.apiKeyIn, config.app.apiKeyHeader)
+    if (config.app.oauth !== undefined) oauthConfig = oauthConfigSchema.parse(config.app.oauth)
     specUrl = config.app.specUrl ? z.string().trim().url().max(2048).parse(config.app.specUrl) : undefined
     if (specUrl) parseOutboundUrl(specUrl)
   } catch (err: any) {
     if (err?.code === 'SSRF_BLOCKED') throw new HttpError(422, `Import failed: spec URL: ${err.message}`)
-    if (err instanceof HttpError) throw new HttpError(422, `Import failed: app.apiKeyHeader: ${err.message}`)
     if (!(err instanceof z.ZodError)) throw err
     const issue = err.issues[0]
     throw new HttpError(422, `Import failed: ${issue.path.length ? `${issue.path.join('.')}: ` : ''}${issue.message}`)
   }
+  let credential
+  try {
+    credential = await authSetting(config.app.authType ?? 'api_key', oauthConfig, config.app.apiKeyIn, config.app.apiKeyHeader)
+  } catch (err) {
+    if (err instanceof HttpError) throw new HttpError(422, `Import failed: ${err.message}`)
+    throw err
+  }
   await ensurePublicTarget(settings.baseUrl, 'Base URL')
 
+  const { oauth, ...location } = credential
   const now = Date.now()
   const app: App = {
     id: newId(),
@@ -291,7 +347,8 @@ router.post('/apps/import-config', express.text({ type: () => true, limit: '5mb'
     name: settings.name,
     baseUrl: settings.baseUrl.replace(/\/+$/, ''),
     specUrl,
-    ...credential,
+    ...location,
+    ...(oauth ? { oauth } : {}),
     hasApiKey: false,
     rateLimitPerMin: settings.rateLimitPerMin,
     readOnly: config.app.readOnly ?? false,
@@ -308,6 +365,21 @@ router.post('/apps/import-config', express.text({ type: () => true, limit: '5mb'
   await appRepo.insert(app, undefined)
   await toolRepo.insertMany(built.tools)
   res.status(201).json({ ...publicApp(app), toolCount: built.tools.length, skipped: built.skipped })
+}))
+
+// Fetches a token with the stored client credentials, to check the OAuth setup. Never returns the token.
+router.post('/apps/:id/auth/test', asyncHandler(async (req, res) => {
+  const app = await ownedApp(req)
+  if (app.authType !== 'oauth2_client_credentials' || !app.oauth) throw new HttpError(400, 'This app does not use OAuth client credentials')
+  const secret = await appRepo.getApiKey(app.id)
+  if (!secret) throw new HttpError(400, 'Add the client secret first')
+  try {
+    const info = await requestToken(app.oauth, secret)
+    res.json({ ok: true, tokenType: info.tokenType, expiresIn: info.expiresIn, ...(info.scope ? { scope: info.scope } : {}) })
+  } catch (err) {
+    if (err instanceof UpstreamAuthError) return void res.json({ ok: false, error: err.message })
+    throw err
+  }
 }))
 
 // ── Tools ──────────────────────────────────────────────────────────────────────

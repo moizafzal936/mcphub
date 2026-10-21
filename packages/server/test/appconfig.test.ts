@@ -42,7 +42,7 @@ test('export carries the app and tools but never the key, ids or owner', async (
   assert.ok(!text.includes(app.id), 'app id exported')
   assert.ok(!/"(id|appId|ownerId|hasApiKey)":/.test(text), 'internal fields exported')
   assert.equal(res.body.format, 'mcphub.app')
-  assert.deepEqual(res.body.app, { name: 'Fixture API', baseUrl: `http://127.0.0.1:${fx.upstreamPort}/v1`, apiKeyHeader: 'Authorization', apiKeyIn: 'header', rateLimitPerMin: 30, readOnly: true })
+  assert.deepEqual(res.body.app, { name: 'Fixture API', baseUrl: `http://127.0.0.1:${fx.upstreamPort}/v1`, apiKeyHeader: 'Authorization', apiKeyIn: 'header', authType: 'api_key', rateLimitPerMin: 30, readOnly: true })
   assert.deepEqual(res.body.tools.map((t: any) => t.name).sort(), ['echo', 'make_item'])
 
   assert.equal((await bob.get(`/api/apps/${app.id}/export`)).status, 404)

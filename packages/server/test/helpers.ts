@@ -17,8 +17,15 @@ export interface Fixtures {
   internalPort: number
   upstreamHits: RecordedRequest[]
   internalHits: RecordedRequest[]
+  /** Requests to the fixture OAuth token endpoint (/oauth/token). */
+  tokenHits: RecordedRequest[]
+  /** Invalidates every access token issued so far, as a server-side revocation would. */
+  revokeTokens(): void
   close(): Promise<void>
 }
+
+export const OAUTH_CLIENT_ID = 'fixture-client'
+export const OAUTH_CLIENT_SECRET = 'fixture-secret-Zq81+/='
 
 function listen(server: http.Server): Promise<number> {
   return new Promise(resolve => server.listen(0, '127.0.0.1', () => resolve((server.address() as AddressInfo).port)))
@@ -36,6 +43,9 @@ function readBody(req: http.IncomingMessage): Promise<string> {
 export async function startFixtures(): Promise<Fixtures> {
   const upstreamHits: RecordedRequest[] = []
   const internalHits: RecordedRequest[] = []
+  const tokenHits: RecordedRequest[] = []
+  const validTokens = new Set<string>()
+  let tokenCounter = 0
   let upstreamPort = 0
   let internalPort = 0
 
@@ -46,11 +56,36 @@ export async function startFixtures(): Promise<Fixtures> {
 
   const upstream = http.createServer(async (req, res) => {
     const body = await readBody(req)
-    upstreamHits.push({ method: req.method!, url: req.url!, headers: req.headers, body })
     const url = new URL(req.url!, 'http://x')
     const json = (status: number, payload: unknown) => {
       res.writeHead(status, { 'content-type': 'application/json' })
       res.end(JSON.stringify(payload))
+    }
+    if (url.pathname.startsWith('/oauth/')) {
+      tokenHits.push({ method: req.method!, url: req.url!, headers: req.headers, body })
+      const form = new URLSearchParams(body)
+      let id = form.get('client_id')
+      let secret = form.get('client_secret')
+      const basic = /^Basic (.+)$/.exec(req.headers.authorization ?? '')
+      if (basic) {
+        const [u, p] = Buffer.from(basic[1], 'base64').toString().split(':')
+        id = decodeURIComponent(u)
+        secret = decodeURIComponent(p ?? '')
+      }
+      if (form.get('grant_type') !== 'client_credentials') return json(400, { error: 'unsupported_grant_type' })
+      if (id !== OAUTH_CLIENT_ID || secret !== OAUTH_CLIENT_SECRET) return json(401, { error: 'invalid_client', error_description: 'Client authentication failed' })
+      const token = `fixture-access-token-${++tokenCounter}`
+      validTokens.add(token)
+      if (url.pathname === '/oauth/token-mac') return json(200, { access_token: token, token_type: 'mac', expires_in: 3600 })
+      // Tokens shorter-lived than the refresh margin are fetched again on every call.
+      const expires = url.pathname === '/oauth/token-short' ? 30 : 3600
+      return json(200, { access_token: token, token_type: 'Bearer', expires_in: expires, ...(form.get('scope') ? { scope: form.get('scope') } : {}) })
+    }
+    upstreamHits.push({ method: req.method!, url: req.url!, headers: req.headers, body })
+    if (url.pathname === '/v1/protected') {
+      const presented = /^Bearer (.+)$/.exec(req.headers.authorization ?? '')?.[1]
+      if (!presented || !validTokens.has(presented)) return json(401, { error: 'invalid_token' })
+      return json(200, { ok: true, token: presented })
     }
     const redirect = (to: string) => {
       res.writeHead(302, { location: to })
@@ -112,6 +147,8 @@ export async function startFixtures(): Promise<Fixtures> {
     internalPort,
     upstreamHits,
     internalHits,
+    tokenHits,
+    revokeTokens: () => validTokens.clear(),
     close: async () => {
       upstream.closeAllConnections()
       internal.closeAllConnections()

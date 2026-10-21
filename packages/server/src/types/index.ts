@@ -1,3 +1,12 @@
+export interface OAuthClientConfig {
+  tokenUrl: string
+  clientId: string
+  scope?: string
+  audience?: string
+  /** How the client secret is sent to the token endpoint: HTTP Basic (default) or form body. */
+  clientAuth: 'basic' | 'post'
+}
+
 export interface App {
   id: string
   ownerId: string | null
@@ -7,6 +16,9 @@ export interface App {
   /** Name of the header or query parameter that carries the upstream credential. */
   apiKeyHeader: string
   apiKeyIn: 'header' | 'query'
+  /** api_key: the stored secret is sent as-is. oauth2_client_credentials: it is the client secret used to fetch tokens. */
+  authType: 'api_key' | 'oauth2_client_credentials'
+  oauth?: OAuthClientConfig
   hasApiKey: boolean
   rateLimitPerMin: number | null
   readOnly: boolean

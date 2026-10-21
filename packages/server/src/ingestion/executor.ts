@@ -2,6 +2,7 @@ import type { App, McpTool } from '../types/index.js'
 import { safeRequest, SsrfBlockedError } from '../security/ssrf.js'
 import { isReservedHeader, isValidHeaderValue } from '../security/headers.js'
 import { redactString } from '../security/redact.js'
+import { forgetAccessToken, getAccessToken, UpstreamAuthError } from './upstreamAuth.js'
 import { ToolInputError, buildUpstreamUrl, projectResponse, secretForms, toolForApp, validateToolArgs } from './toolSchema.js'
 
 // What AI clients receive. Big API responses would otherwise flood the model's context window.
@@ -118,7 +119,25 @@ export async function executeTool(
     }
   }
 
-  if (apiKey && app.apiKeyIn === 'query') {
+  const oauth = app.authType === 'oauth2_client_credentials'
+  let usedCachedToken = false
+  const applyToken = async (fresh: boolean): Promise<string | undefined> => {
+    try {
+      const { token, cached } = await getAccessToken(app, apiKey!, { fresh })
+      usedCachedToken = cached
+      headers.Authorization = `Bearer ${token}`
+      secrets.push(...secretForms(token))
+      return undefined
+    } catch (err) {
+      if (err instanceof UpstreamAuthError) return err.message
+      throw err
+    }
+  }
+  if (oauth) {
+    if (!apiKey) return failure(start, 'No OAuth client secret is stored for this app (add it in Settings)')
+    const authError = await applyToken(false)
+    if (authError) return failure(start, `Could not get an access token: ${authError}`)
+  } else if (apiKey && app.apiKeyIn === 'query') {
     queryParams[app.apiKeyHeader] = apiKey
   } else if (apiKey) {
     const value = app.apiKeyHeader.toLowerCase() === 'authorization' && !/^\w+\s/.test(apiKey) ? `Bearer ${apiKey}` : apiKey
@@ -142,18 +161,27 @@ export async function executeTool(
   }
   const request = { method: tool.method, url: shown.toString().replace('%5BREDACTED%5D', '[REDACTED]') }
 
+  const send = () => safeRequest({
+    method: tool.method,
+    url: url.toString(),
+    params: queryParams,
+    headers: { ...headers },
+    data: body,
+    redirects: 'same-origin',
+    timeout: UPSTREAM_TIMEOUT_MS,
+    maxContentLength: MAX_UPSTREAM_RESPONSE_BYTES,
+    maxBodyLength: MAX_UPSTREAM_REQUEST_BYTES,
+  })
+
   try {
-    const response = await safeRequest({
-      method: tool.method,
-      url: url.toString(),
-      params: queryParams,
-      headers,
-      data: body,
-      redirects: 'same-origin',
-      timeout: UPSTREAM_TIMEOUT_MS,
-      maxContentLength: MAX_UPSTREAM_RESPONSE_BYTES,
-      maxBodyLength: MAX_UPSTREAM_REQUEST_BYTES,
-    })
+    let response = await send()
+    // A cached token may have been revoked early: fetch a fresh one and retry once.
+    if (oauth && usedCachedToken && response.status === 401) {
+      forgetAccessToken(app.id)
+      const authError = await applyToken(true)
+      if (authError) return failure(start, `Could not get an access token: ${authError}`)
+      response = await send()
+    }
     const raw = typeof response.data === 'string' ? response.data : String(response.data ?? '')
     const scrubbed = redactString(raw, secrets)
     let parsed: unknown = scrubbed

@@ -22,6 +22,8 @@ export interface AppConfig {
     specUrl?: string
     apiKeyHeader: string
     apiKeyIn: App['apiKeyIn']
+    authType: App['authType']
+    oauth?: App['oauth']
     rateLimitPerMin: number | null
     readOnly: boolean
   }
@@ -39,6 +41,8 @@ export function exportAppConfig(app: App, tools: McpTool[]): AppConfig {
       ...(app.specUrl ? { specUrl: app.specUrl } : {}),
       apiKeyHeader: app.apiKeyHeader,
       apiKeyIn: app.apiKeyIn,
+      authType: app.authType,
+      ...(app.oauth ? { oauth: app.oauth } : {}),
       rateLimitPerMin: app.rateLimitPerMin,
       readOnly: app.readOnly,
     },
@@ -66,6 +70,8 @@ export const appConfigSchema = z.object({
     specUrl: z.string().optional(),
     apiKeyHeader: z.string().trim().min(1).max(256).optional(),
     apiKeyIn: z.enum(['header', 'query']).optional(),
+    authType: z.enum(['api_key', 'oauth2_client_credentials']).optional(),
+    oauth: z.unknown().optional(),
     rateLimitPerMin: z.number().nullable().optional(),
     readOnly: z.boolean().optional(),
   }),
