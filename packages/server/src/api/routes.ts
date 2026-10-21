@@ -327,6 +327,11 @@ router.get('/apps/:id/logs', asyncHandler(async (req, res) => {
   res.json(await logRepo.findByAppId(app.id, limit))
 }))
 
+router.get('/apps/:id/tool-stats', asyncHandler(async (req, res) => {
+  const app = await ownedApp(req)
+  res.json(await logRepo.statsByTool(app.id, Date.now() - 86_400_000))
+}))
+
 // ── MCP access tokens ──────────────────────────────────────────────────────────
 
 router.get('/apps/:id/tokens', asyncHandler(async (req, res) => {

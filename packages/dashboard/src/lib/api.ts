@@ -165,6 +165,8 @@ export const api = {
       http.patch(`/apps/${appId}/tools/${toolId}`, data).then(r => r.data),
     delete: (appId: string, toolId: string) =>
       http.delete(`/apps/${appId}/tools/${toolId}`).then(r => r.data),
+    stats: (appId: string) =>
+      http.get<{ toolName: string; calls: number; errors: number; avgMs: number; lastCalledAt: number }[]>(`/apps/${appId}/tool-stats`).then(r => r.data),
     execute: (appId: string, toolId: string, args: Record<string, unknown>) =>
       http.post<ExecResult>(`/apps/${appId}/tools/${toolId}/execute`, args).then(r => r.data),
   },

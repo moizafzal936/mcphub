@@ -547,6 +547,24 @@ export const logRepo = {
     return res.rows.map(rowToLog)
   },
 
+  /** Per-tool call counts, errors (status 0 or >= 400) and average latency since `since`. */
+  async statsByTool(appId: string, since: number): Promise<{ toolName: string; calls: number; errors: number; avgMs: number; lastCalledAt: number }[]> {
+    const res = await getDb().execute({
+      sql: `SELECT tool_name, COUNT(*) AS calls,
+                   SUM(CASE WHEN status_code = 0 OR status_code >= 400 THEN 1 ELSE 0 END) AS errors,
+                   AVG(duration_ms) AS avg_ms, MAX(called_at) AS last_at
+            FROM tool_call_logs WHERE app_id = ? AND called_at >= ? GROUP BY tool_name`,
+      args: [appId, since],
+    })
+    return res.rows.map(r => ({
+      toolName: String(r.tool_name),
+      calls: Number(r.calls),
+      errors: Number(r.errors),
+      avgMs: Math.round(Number(r.avg_ms)),
+      lastCalledAt: Number(r.last_at),
+    }))
+  },
+
   async lastCalledAt(appId: string): Promise<number | null> {
     const res = await getDb().execute({ sql: 'SELECT MAX(called_at) AS t FROM tool_call_logs WHERE app_id = ?', args: [appId] })
     return res.rows[0]?.t == null ? null : Number(res.rows[0].t)

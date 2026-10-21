@@ -309,6 +309,12 @@ export default function AppDetailPage() {
   const [showCurl, setShowCurl] = useState(false)
   const [showSpec, setShowSpec] = useState(false)
   const [editing, setEditing] = useState<{ id: string; name: string; description: string } | null>(null)
+  const [stats, setStats] = useState<Record<string, { calls: number; errors: number; avgMs: number }>>({})
+
+  useEffect(() => {
+    if (!id || tab !== 'tools') return
+    api.tools.stats(id).then(list => setStats(Object.fromEntries(list.map(s => [s.toolName, s])))).catch(() => {})
+  }, [id, tab])
   const logPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const fetchLogs = useCallback(async () => {
@@ -559,7 +565,16 @@ export default function AppDetailPage() {
                   </form>
                 ) : (
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-white">{tool.name}</p>
+                    <p className="text-sm font-semibold text-white flex items-center gap-2">
+                      {tool.name}
+                      {stats[tool.name] && (
+                        <span className="text-[10px] font-normal text-gray-500" title="Last 24 hours">
+                          {stats[tool.name].calls} call{stats[tool.name].calls === 1 ? '' : 's'}
+                          {stats[tool.name].errors > 0 && <span className="text-red-400"> · {stats[tool.name].errors} failed</span>}
+                          {' · '}{stats[tool.name].avgMs}ms avg
+                        </span>
+                      )}
+                    </p>
                     <p className="text-xs text-gray-500 truncate">{tool.description}</p>
                   </div>
                 )}

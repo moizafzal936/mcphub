@@ -155,3 +155,19 @@ test('repeated failed logins are rate limited, then even the right password is r
   const right = await c.post('/api/auth/login', { email: 'operator@example.test', password: 'correct horse battery staple' })
   assert.equal(right.status, 429)
 })
+
+test('per-tool stats count calls, errors and latency, scoped to the owner', async () => {
+  const app = await createApp(operator, fx)
+  const ok = await addTool(operator, app.id, { name: 'ok_tool', path: '/echo' })
+  const missing = await addTool(operator, app.id, { name: 'missing_tool', path: '/nope' })
+  await exec(operator, app.id, ok.id, {})
+  await exec(operator, app.id, ok.id, {})
+  await exec(operator, app.id, missing.id, {})
+  const stats = (await operator.get(`/api/apps/${app.id}/tool-stats`)).body
+  const byName = Object.fromEntries(stats.map((s: any) => [s.toolName, s]))
+  assert.equal(byName.ok_tool.calls, 2)
+  assert.equal(byName.ok_tool.errors, 0)
+  assert.equal(byName.missing_tool.errors, 1)
+  assert.equal(typeof byName.ok_tool.avgMs, 'number')
+  assert.equal((await other.get(`/api/apps/${app.id}/tool-stats`)).status, 404)
+})
